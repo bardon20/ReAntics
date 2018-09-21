@@ -8,6 +8,7 @@ from Ant import UNIT_STATS
 from Move import Move
 from GameState import *
 from AIPlayerUtils import *
+from typing import Type
 
 
 ##
@@ -30,6 +31,9 @@ class AIPlayer(Player):
     ##
     def __init__(self, inputPlayerId):
         super(AIPlayer,self).__init__(inputPlayerId, "Random")
+
+    def examine_game_state(self, current_state: GameState) -> int:
+        pass
     
     ##
     #getPlacement
@@ -61,8 +65,6 @@ class AIPlayer(Player):
                     #Set the move if this space is empty
                     if currentState.board[x][y].constr == None and (x, y) not in moves:
                         move = (x, y)
-                        #Just need to make the space non-empty. So I threw whatever I felt like in there.
-                        currentState.board[x][y].constr == True
                 moves.append(move)
             return moves
         elif currentState.phase == SETUP_PHASE_2:   #stuff on foe's side
@@ -78,8 +80,6 @@ class AIPlayer(Player):
                     #Set the move if this space is empty
                     if currentState.board[x][y].constr == None and (x, y) not in moves:
                         move = (x, y)
-                        #Just need to make the space non-empty. So I threw whatever I felt like in there.
-                        currentState.board[x][y].constr == True
                 moves.append(move)
             return moves
         else:
@@ -104,25 +104,47 @@ class AIPlayer(Player):
             selectedMove = moves[random.randint(0,len(moves) - 1)];
             
         return selectedMove
-    
-    ##
-    #getAttack
-    #Description: Gets the attack to be made from the Player
+
+    # getAttack
+    # Description: Gets the attack to be made from the Player
     #
-    #Parameters:
+    # Parameters:
     #   currentState - A clone of the current state (GameState)
     #   attackingAnt - The ant currently making the attack (Ant)
     #   enemyLocation - The Locations of the Enemies that can be attacked (Location[])
     ##
     def getAttack(self, currentState, attackingAnt, enemyLocations):
-        #Attack a random enemy.
+        # Attack a random enemy.
         return enemyLocations[random.randint(0, len(enemyLocations) - 1)]
 
-    ##
-    #registerWin
+    # registerWin
     #
-    # This agent doens't learn
+    # This agent doesn't learn
     #
     def registerWin(self, hasWon):
-        #method templaste, not implemented
+        # method template, not implemented
         pass
+
+
+class Node:
+    def __init__(self, move: Move, state: GameState, state_evaluation: int, parent_node):
+        self._move = move
+        self._state = state
+        self._state_evaluation = state_evaluation
+        self._parent_node = parent_node
+
+    @property
+    def move(self) -> Move:
+        return self._move
+
+    @property
+    def state(self) -> GameState:
+        return self._state
+
+    @property
+    def state_evaluation(self) -> int:
+        return self._state_evaluation
+
+    @property
+    def parent_node(self):
+        return self._parent_node
