@@ -150,6 +150,28 @@ class AIPlayer(Player):
             return -1.0
         return game_state_score
 
+    def call_nodes_recursively(self, current_state, depth_limit):
+        all_legal_moves = self.all_possible_moves(current_state)
+        next_game_states: List[GameState] = []
+        for move in all_legal_moves:
+            next_game_states.append(getNextState(current_state, move))
+
+        if depth_limit < 2:
+            for game_state in next_game_states:
+                self.call_nodes_recursively(game_state, depth_limit+1)
+    
+    def average_evaluation_score(self, nodes: list) -> float:
+        evaluation_score_sum = 0
+        for node in nodes:
+            evaluation_score_sum += node.state_evaluation
+        return evaluation_score_sum / len(nodes)
+
+    def all_possible_moves(self, current_state):
+        all_legal_moves = []
+        all_legal_moves.extend(listAllMovementMoves(current_state))
+        all_legal_moves.extend(listAllBuildMoves(current_state))
+        return all_legal_moves
+
 
 class Node:
     def __init__(self, move: Move, state: GameState, state_evaluation: int, parent_node):
