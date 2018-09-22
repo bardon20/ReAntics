@@ -1,7 +1,9 @@
 from AIPlayerUtils import *
 from Constants import *
 from GameState import GameState
+from Inventory import Inventory
 from Player import Player
+from typing import Dict, List
 
 
 # AIPlayer
@@ -104,8 +106,10 @@ class AIPlayer(Player):
         # method template, not implemented
         pass
 
-    def examine_game_state(self, current_state: GameState) -> int:
-        pass
+    def examine_game_state(self, current_state: GameState) -> float:
+        game_state_score = 0.0
+
+        return game_state_score
 
 
 class Node:
@@ -130,3 +134,146 @@ class Node:
     @property
     def parent_node(self):
         return self._parent_node
+
+
+class Items:
+    """
+    Items
+
+    Helper class that serves three primary purposes.
+    First, it handles calls to getAntList, getConstrList, etc.
+    so that the main AIPlayer class doesn't have to do this.
+    Second, it provides type hints so that the main AIPlayer class doesn't get cluttered with them.
+    Third, it handles the logic for getting the inventory and me/enemy,
+    so these lines of code aren't repeated needlessly in the main AIPlayer class.
+    """
+    def __init__(self, current_state: GameState):
+        """
+        __init__
+
+        Creates a new Items object.
+
+        :param current_state: The current GameState.
+        """
+        self._current_state = current_state
+        self._my_inventory: Inventory = getCurrPlayerInventory(current_state)
+
+        # I should either be 0 or 1 (enemy is just 1 or 0, respectively)
+        self._me: int = current_state.whoseTurn
+        self._enemy = 1 - current_state.whoseTurn
+
+    @property
+    def my_food_count(self) -> int:
+        """
+        my_food_count
+
+        :return: The amount of food I currently have.
+        """
+        return self._my_inventory.foodCount
+
+    @property
+    def my_closest_food(self) -> Construction:
+        """
+        my_closest_food
+
+        :return: My food that is the closest to my tunnel.
+        """
+        # Distance to food and the corresponding food.
+        food_distances_dict: Dict[int, Construction] = {}
+        foods = getConstrList(self._current_state, None, (FOOD,))
+        for food in foods:
+            food_dist = stepsToReach(self._current_state, self.my_tunnel.coords, food.coords)
+            food_distances_dict[food_dist] = food
+
+        # Return the food that has the minimum cost to get to.
+        return food_distances_dict[min(food_distances_dict)]
+
+    @property
+    def my_ants(self) -> List[Ant]:
+        """
+        my_ants
+
+        :return: A list of all of my ants.
+        """
+        return getAntList(self._current_state, self._me)
+
+    @property
+    def my_queen(self) -> Ant:
+        """
+        my_queen
+
+        :return: My queen from my inventory.
+        """
+        return self._my_inventory.getQueen()
+
+    @property
+    def my_workers(self) -> List[Ant]:
+        """
+        my_workers
+
+        :return: A list of my workers.
+        """
+        return getAntList(self._current_state, self._me, (WORKER,))
+
+    @property
+    def my_drones(self) -> List[Ant]:
+        """
+        my_drones
+
+        :return: A list of my drones.
+        """
+        return getAntList(self._current_state, self._me, (DRONE,))
+
+    @property
+    def my_r_soldiers(self) -> List[Ant]:
+        """
+        my_r_soldiers
+
+        :return: A list of my ranged soldiers.
+        """
+        return getAntList(self._current_state, self._me, (R_SOLDIER,))
+
+    @property
+    def my_anthill(self) -> Construction:
+        """
+        my_anthill
+
+        :return: My anthill from my inventory.
+        """
+        return self._my_inventory.getAnthill()
+
+    @property
+    def my_tunnel(self) -> Construction:
+        """
+        my_tunnel
+
+        :return: My tunnel.
+        """
+        return getConstrList(self._current_state, self._me, (TUNNEL,))[0]
+
+    @property
+    def enemy_workers(self) -> List[Ant]:
+        """
+        enemy_workers
+
+        :return: A list of the enemy's workers.
+        """
+        return getAntList(self._current_state, self._enemy, (WORKER,))
+
+    @property
+    def enemy_anthill(self) -> Construction:
+        """
+        enemy_anthill
+
+        :return: The enemy's anthill.
+        """
+        return getConstrList(self._current_state, self._enemy, (ANTHILL,))[0]
+
+    @property
+    def enemy_tunnel(self) -> Construction:
+        """
+        enemy_tunnel
+
+        :return: The enemy's tunnel.
+        """
+        return getConstrList(self._current_state, self._enemy, (TUNNEL,))[0]
