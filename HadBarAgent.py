@@ -108,7 +108,46 @@ class AIPlayer(Player):
 
     def examine_game_state(self, current_state: GameState) -> float:
         game_state_score = 0.0
+        items = Items(current_state)
 
+        my_workers = items.my_workers
+        for _ in my_workers:
+            game_state_score += 0.1
+
+        enemy_workers = items.enemy_workers
+        for _ in enemy_workers:
+            game_state_score -= 0.1
+
+        my_drones = items.my_drones
+        for _ in my_drones:
+            game_state_score += 0.1
+
+        enemy_drones = items.enemy_drones
+        for _ in enemy_drones:
+            game_state_score -= 0.1
+
+        my_r_soldiers = items.my_r_soldiers
+        for _ in my_r_soldiers:
+            game_state_score += 0.1
+
+        enemy_r_soldiers = items.enemy_r_soldiers
+        for _ in enemy_r_soldiers:
+            game_state_score -= 0.1
+
+        my_food_count = items.my_food_count
+        game_state_score += my_food_count / 44
+
+        enemy_food_count = items.enemy_food_count
+        game_state_score -= enemy_food_count / 44
+
+        my_ants = items.my_ants
+        for ant in my_ants:
+            pass
+
+        if game_state_score > 1.0:
+            return 1.0
+        elif game_state_score < -1.0:
+            return -1.0
         return game_state_score
 
 
@@ -156,11 +195,13 @@ class Items:
         :param current_state: The current GameState.
         """
         self._current_state = current_state
-        self._my_inventory: Inventory = getCurrPlayerInventory(current_state)
 
         # I should either be 0 or 1 (enemy is just 1 or 0, respectively)
         self._me: int = current_state.whoseTurn
         self._enemy = 1 - current_state.whoseTurn
+
+        self._my_inventory: Inventory = current_state.inventories[self._me]
+        self._enemy_inventory: Inventory = current_state.inventories[self._enemy]
 
     @property
     def my_food_count(self) -> int:
@@ -170,6 +211,15 @@ class Items:
         :return: The amount of food I currently have.
         """
         return self._my_inventory.foodCount
+
+    @property
+    def enemy_food_count(self) -> int:
+        """
+        enemy_food_count
+
+        :return: The amount of food that the enemy currently has.
+        """
+        return self._enemy_inventory.foodCount
 
     @property
     def my_closest_food(self) -> Construction:
@@ -204,7 +254,7 @@ class Items:
 
         :return: My queen from my inventory.
         """
-        return self._my_inventory.getQueen()
+        return getAntList(self._current_state, self._me, (QUEEN,))
 
     @property
     def my_workers(self) -> List[Ant]:
@@ -223,6 +273,15 @@ class Items:
         :return: A list of my drones.
         """
         return getAntList(self._current_state, self._me, (DRONE,))
+
+    @property
+    def my_soldiers(self) -> List[Ant]:
+        """
+        my_soldiers
+
+        :return: A list of my soldiers.
+        """
+        return getAntList(self._current_state, self._me, (SOLDIER,))
 
     @property
     def my_r_soldiers(self) -> List[Ant]:
@@ -250,6 +309,42 @@ class Items:
         :return: My tunnel.
         """
         return getConstrList(self._current_state, self._me, (TUNNEL,))[0]
+
+    @property
+    def enemy_drones(self) -> List[Ant]:
+        """
+        enemy_drones
+
+        :return: A list of enemy drones.
+        """
+        return getAntList(self._current_state, self._enemy, (DRONE,))
+
+    @property
+    def enemy_soldiers(self) -> List[Ant]:
+        """
+        my_soldiers
+
+        :return: A list of my soldiers.
+        """
+        return getAntList(self._current_state, self._enemy, (SOLDIER,))
+
+    @property
+    def enemy_r_soldiers(self) -> List[Ant]:
+        """
+        enemy_r_soldiers
+
+        :return: A list of enemy ranged soldiers.
+        """
+        return getAntList(self._current_state, self._enemy, (R_SOLDIER,))
+
+    @property
+    def enemy_queen(self) -> Ant:
+        """
+        enemy_queen
+
+        :return: Enemy queen from my inventory.
+        """
+        return getAntList(self._current_state, self._enemy, (QUEEN,))
 
     @property
     def enemy_workers(self) -> List[Ant]:
