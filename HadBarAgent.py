@@ -104,10 +104,6 @@ class AIPlayer(Player):
         # method template, not implemented
         pass
 
-
-
-
-
     def score_number_of_ants(self, current_state):
         # If more than enemy or not
         pass
@@ -138,18 +134,11 @@ class AIPlayer(Player):
         # how many attacking ants are around anthill
         pass
 
-
-
-
-
-
     def examine_game_state(self, current_state: GameState) -> float:
         game_state_score = 0.0
         items = Items(current_state)
         food_score=0
         health_score=0
-        e_food_score=0
-        e_health_score=0
 
         my_queen = items.my_queen
 
@@ -172,7 +161,7 @@ class AIPlayer(Player):
             worker_health -= e_worker.health/5
             # check if carrying food
             if e_worker.carrying:
-                e_food_score -= 0.01
+                food_score -= 0.01
             # subtract from score for each worker
             game_state_score -= 0.1
 
@@ -183,8 +172,9 @@ class AIPlayer(Player):
             # check health
             drone_health += drone.health/5
             # check proximity to queen/anthill
-
-            # subtract from score for each drone
+            drone_prox = (drone.coords - items.enemy_queen) + (drone.coords - items.enemy_anthill)
+            game_state_score += drone_prox/5
+            # add to score for each drone
             game_state_score += 0.1
 
         # same for enemy drones
@@ -193,7 +183,9 @@ class AIPlayer(Player):
             # check health
             drone_health -= e_drone.health/5
             # check proximity to queen/anthill
-
+            e_drone_prox = (e_drone.coords - items.my_queen) + (e_drone.coords - items.my_anthill)
+            game_state_score -= e_drone_prox / 5
+            # subtract from score for each drone
             game_state_score -= 0.1
 
         # check each of own range soldiers
@@ -203,7 +195,8 @@ class AIPlayer(Player):
             # check health
             r_soldier_health += r_soldier.health/5
             # check for proximity fo anthill/queen
-
+            r_soldier_prox = (r_soldier.coords - items.enemy_anthill) + (r_soldier.coords - items.enemy_queen)
+            game_state_score += r_soldier_prox/5
             # update score for each soldier
             game_state_score += 0.1
 
@@ -213,7 +206,8 @@ class AIPlayer(Player):
             # check health
             r_soldier_health -= e_r_soldier.health / 5
             # check proximity fo anthill/queen
-
+            e_r_soldier_prox = (e_r_soldier.coords - items.my_anthill) + (e_r_soldier.coords - items.my_queen)
+            game_state_score -= r_soldier_prox / 5
             # subtract from score for each range soldier
             game_state_score -= 0.1
 
@@ -224,7 +218,8 @@ class AIPlayer(Player):
             # check health
             soldier_health += soldier.health / 5
             # check for proximity fo anthill/queen
-
+            soldier_prox = (soldier.coords - items.enemy_anthill) + (soldier.coords - items.enemy_queen)
+            game_state_score += soldier_prox / 5
             # update score for each soldier
             game_state_score += 0.1
 
@@ -234,17 +229,16 @@ class AIPlayer(Player):
             # check health
             soldier_health -= e_soldier.health / 5
             # check proximity fo anthill/queen
-
+            e_soldier_prox = (e_soldier.coords - items.my_anthill) + (e_soldier.coords - items.my_queen)
+            game_state_score += e_soldier_prox / 5
             # subtract from score for each range soldier
             game_state_score -= 0.1
 
-        # check health of own queen
-        #health_score = items.my_queen/5
-        # check health of enemy queen
-        #e_health_score - items.enemy_queen/5
+        # check health of own queen minus enemy's queen
+        health_score = items.my_queen.health/5 - items.enemy_queen.health/5
 
         # add up health score
-        health_score = health_score + worker_health + drone_health + r_soldier_health + soldier_health
+        health_score += worker_health + drone_health + r_soldier_health + soldier_health
 
         # add to score for own total amount of food
         my_food_count = items.my_food_count
@@ -254,7 +248,7 @@ class AIPlayer(Player):
         enemy_food_count = items.enemy_food_count
         game_state_score -= enemy_food_count / 44
 
-        # check how well protect own anthill is, add to score
+
 
         # check how well protects own anthill is, subtract from score
 
@@ -263,12 +257,28 @@ class AIPlayer(Player):
             pass
 
         # How threatened the queen is
-        enemy_fighters = enemy_drones + enemy_soldiers  + enemy_r_soldiers
+        # check how well protect own anthill is
+        enemy_fighters = enemy_drones + enemy_soldiers + enemy_r_soldiers
         for fighter in enemy_fighters:
+            # check grass
             steps_to_queen = stepsToReach(current_state, fighter, my_queen.coords)
+            steps_to_anthill = stepsToReach(current_state, fighter, items.my_anthill.coords)
             if steps_to_queen < 2:
                 game_state_score -= 0.1
+            if steps_to_anthill < 2:
+                game_state_score -=0.1
 
+        # how threatened enemy queens is
+        # check how well protected enemy anthill is protected
+        my_fighters = my_drones + my_r_soldiers + my_soldiers
+        for fighter in my_fighters:
+            # check grass
+            steps_to_e_queen = stepsToReach(current_state, fighter, my_queen.coords)
+            steps_to_e_anthill = stepsToReach(current_state, fighter, items.enemy_anthill.coords)
+            if steps_to_e_queen < 2:
+                game_state_score += 0.1
+            if steps_to_e_anthill < 2:
+                game_state_score += 0.1
 
         if game_state_score > 1.0:
             game_state_score = 0.99
@@ -282,7 +292,6 @@ class AIPlayer(Player):
             return 1.0
         else:
             return -1.0
-
 
 
     def find_best_move(self, current_state, current_depth, parent_node):
