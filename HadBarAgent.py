@@ -189,7 +189,7 @@ class AIPlayer(Player):
             game_state_score -= 0.1
 
         # check each of own range soldiers
-        r_soldier_health=0
+        r_soldier_health = 0
         my_r_soldiers = items.my_r_soldiers
         for r_soldier in my_r_soldiers:
             # check health
@@ -228,7 +228,7 @@ class AIPlayer(Player):
         for e_soldier in enemy_soldiers:
             # check health
             soldier_health -= e_soldier.health / 5
-            # check proximity fo anthill/queen
+            # check proximity to queen
             e_soldier_prox = (e_soldier.coords - items.my_anthill) + (e_soldier.coords - items.my_queen)
             game_state_score += e_soldier_prox / 5
             # subtract from score for each range soldier
@@ -248,9 +248,18 @@ class AIPlayer(Player):
         enemy_food_count = items.enemy_food_count
         game_state_score -= enemy_food_count / 44
 
+        # check grass around own anthill
+        my_anthill_grass = getConstrList(current_state, GRASS)
+        for grass in my_anthill_grass:
+            game_state_score += (grass.coords - items.my_anthill)/5
 
+        # check grass around enemy anthill
+        enemy_anthill_grass = getConstrList(current_state, GRASS)
+        for grass in enemy_anthill_grass:
+            game_state_score -= (grass.coords - items.enemy_anthill) / 5
 
-        # check how well protects own anthill is, subtract from score
+        # add food and health score to total score
+        game_state_score += health_score + food_score
 
         my_ants = items.my_ants
         for ant in my_ants:
