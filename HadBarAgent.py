@@ -77,14 +77,12 @@ class AIPlayer(Player):
     #
     # Return: The Move to be made
     def getMove(self, current_state):
-        moves = listAllLegalMoves(current_state)
-        selected_move = moves[random.randint(0, len(moves) - 1)]
-
-        # don't do a build move if there are already 3+ ants
-        num_ants = len(current_state.inventories[current_state.whoseTurn].ants)
-        while selected_move.moveType == BUILD and num_ants >= 3:
-            selected_move = moves[random.randint(0, len(moves) - 1)]
-        return selected_move
+        move = self.find_best_move(current_state, 0, None)
+        if move:
+            pass
+        if not move:
+            pass
+        return move
 
     # getAttack
     # Description: Gets the attack to be made from the Player
@@ -106,6 +104,45 @@ class AIPlayer(Player):
         # method template, not implemented
         pass
 
+
+
+
+
+    def score_number_of_ants(self, current_state):
+        # If more than enemy or not
+        pass
+
+    def score_ant_types(self, current_state):
+        # Multiplier for differing types of ants
+        # Soldier/r-soldier: x3
+        # Drone: x2
+        # Worker: x1
+
+        # If you have more ___ than ___ (specific types)
+        pass
+
+    def score_ant_health(self, current_state):
+        # If you have more health or not
+        pass
+
+    def score_food(self, current_state):
+
+        pass
+
+    def score_queen_threatened(self, current_state):
+        # Use steps to reach on enemy fighters
+        pass
+
+    def score_anthill_protected(self, current_state):
+        # How much grass around
+        # how many attacking ants are around anthill
+        pass
+
+
+
+
+
+
     def examine_game_state(self, current_state: GameState) -> float:
         game_state_score = 0.0
         items = Items(current_state)
@@ -113,6 +150,8 @@ class AIPlayer(Player):
         health_score=0
         e_food_score=0
         e_health_score=0
+
+        my_queen = items.my_queen
 
         my_workers = items.my_workers
         worker_health=0
@@ -200,9 +239,9 @@ class AIPlayer(Player):
             game_state_score -= 0.1
 
         # check health of own queen
-        health_score = items.my_queen/5
+        #health_score = items.my_queen/5
         # check health of enemy queen
-        e_health_score - items.enemy_queen/5
+        #e_health_score - items.enemy_queen/5
 
         # add up health score
         health_score = health_score + worker_health + drone_health + r_soldier_health + soldier_health
@@ -223,27 +262,62 @@ class AIPlayer(Player):
         for ant in my_ants:
             pass
 
+        # How threatened the queen is
+        enemy_fighters = enemy_drones + enemy_soldiers  + enemy_r_soldiers
+        for fighter in enemy_fighters:
+            steps_to_queen = stepsToReach(current_state, fighter, my_queen.coords)
+            if steps_to_queen < 2:
+                game_state_score -= 0.1
+
+
         if game_state_score > 1.0:
-            return 1.0
+            game_state_score = 0.99
         elif game_state_score < -1.0:
+            game_state_score = -0.99
+
+        winner = getWinner(current_state)
+        if winner is None:
+            return game_state_score
+        elif winner == 1:
+            return 1.0
+        else:
             return -1.0
-        return game_state_score
 
-    def call_nodes_recursively(self, current_state, depth_limit):
+
+
+    def find_best_move(self, current_state, current_depth, parent_node):
+        DEPTH_LIMIT = 1
+        nodes: List[Node] = []
         all_legal_moves = self.all_possible_moves(current_state)
-        next_game_states: List[GameState] = []
         for move in all_legal_moves:
-            next_game_states.append(getNextState(current_state, move))
+            next_state = getNextState(current_state, move)
+            state_evaluation = self.examine_game_state(next_state)
+            node = Node(move, next_state, state_evaluation, parent_node)
 
-        if depth_limit < 2:
-            for game_state in next_game_states:
-                self.call_nodes_recursively(game_state, depth_limit+1)
-    
-    def average_evaluation_score(self, nodes: list) -> float:
-        evaluation_score_sum = 0
-        for node in nodes:
-            evaluation_score_sum += node.state_evaluation
-        return evaluation_score_sum / len(nodes)
+            if current_depth < DEPTH_LIMIT:
+                node.state_evaluation = self.find_best_move(next_state, current_depth + 1, node)
+            nodes.append(node)
+
+        #highest_scoring_node = self.highest_scoring_node(nodes)
+        if current_depth > 0:
+            maxval = -100
+            for n in nodes:
+                if n.state_evaluation > maxval:
+                    maxval = n.state_evaluation
+            return maxval
+        else:
+            maxval = -100
+            maxmove = None
+            for n in nodes:
+                if n.state_evaluation > maxval:
+                    maxval = n.state_evaluation
+                    maxmove = n.move
+            return maxmove
+
+    def highest_scoring_node(self, nodes: list):
+        # Citation: https://stackoverflow.com/questions/13067615/
+        # python-getting-the-max-value-of-y-from-a-list-of-objects
+        return max(nodes, key=lambda node: node.state_evaluation)
 
     def all_possible_moves(self, current_state):
         all_legal_moves = []
@@ -253,27 +327,11 @@ class AIPlayer(Player):
 
 
 class Node:
-    def __init__(self, move: Move, state: GameState, state_evaluation: int, parent_node):
-        self._move = move
-        self._state = state
-        self._state_evaluation = state_evaluation
-        self._parent_node = parent_node
-
-    @property
-    def move(self) -> Move:
-        return self._move
-
-    @property
-    def state(self) -> GameState:
-        return self._state
-
-    @property
-    def state_evaluation(self) -> int:
-        return self._state_evaluation
-
-    @property
-    def parent_node(self):
-        return self._parent_node
+    def __init__(self, move: Move, state: GameState, state_evaluation: float, parent_node):
+        self.move = move
+        self.state = state
+        self.state_evaluation = state_evaluation
+        self.parent_node = parent_node
 
 
 class Items:
