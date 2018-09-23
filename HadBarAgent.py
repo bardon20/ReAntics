@@ -109,36 +109,115 @@ class AIPlayer(Player):
     def examine_game_state(self, current_state: GameState) -> float:
         game_state_score = 0.0
         items = Items(current_state)
+        food_score=0
+        health_score=0
+        e_food_score=0
+        e_health_score=0
 
         my_workers = items.my_workers
-        for _ in my_workers:
+        worker_health=0
+        # check for each of own workers
+        for worker in my_workers:
+            # check the health
+            worker_health -= worker.health/5
+            # check if carrying food
+            if worker.carrying:
+                food_score += 0.01
+            # add to score for each worker
             game_state_score += 0.1
 
+        # same for enemy workers
         enemy_workers = items.enemy_workers
-        for _ in enemy_workers:
+        for e_worker in enemy_workers:
+            # check health
+            worker_health -= e_worker.health/5
+            # check if carrying food
+            if e_worker.carrying:
+                e_food_score -= 0.01
+            # subtract from score for each worker
             game_state_score -= 0.1
 
+        # check each for each of own drones
         my_drones = items.my_drones
-        for _ in my_drones:
+        drone_health=0
+        for drone in my_drones:
+            # check health
+            drone_health += drone.health/5
+            # check proximity to queen/anthill
+
+            # subtract from score for each drone
             game_state_score += 0.1
 
+        # same for enemy drones
         enemy_drones = items.enemy_drones
-        for _ in enemy_drones:
+        for e_drone in enemy_drones:
+            # check health
+            drone_health -= e_drone.health/5
+            # check proximity to queen/anthill
+
             game_state_score -= 0.1
 
+        # check each of own range soldiers
+        r_soldier_health=0
         my_r_soldiers = items.my_r_soldiers
-        for _ in my_r_soldiers:
+        for r_soldier in my_r_soldiers:
+            # check health
+            r_soldier_health += r_soldier.health/5
+            # check for proximity fo anthill/queen
+
+            # update score for each soldier
             game_state_score += 0.1
 
+        # same for enemy range soldiers
         enemy_r_soldiers = items.enemy_r_soldiers
-        for _ in enemy_r_soldiers:
+        for e_r_soldier in enemy_r_soldiers:
+            # check health
+            r_soldier_health -= e_r_soldier.health / 5
+            # check proximity fo anthill/queen
+
+            # subtract from score for each range soldier
             game_state_score -= 0.1
 
+        # check each of own soldiers
+        my_soldiers = items.my_soldiers
+        soldier_health=0
+        for soldier in my_soldiers:
+            # check health
+            soldier_health += soldier.health / 5
+            # check for proximity fo anthill/queen
+
+            # update score for each soldier
+            game_state_score += 0.1
+
+        # same for enemy soldiers
+        enemy_soldiers = items.enemy_soldiers
+        for e_soldier in enemy_soldiers:
+            # check health
+            soldier_health -= e_soldier.health / 5
+            # check proximity fo anthill/queen
+
+            # subtract from score for each range soldier
+            game_state_score -= 0.1
+
+        # check health of own queen
+        health_score = items.my_queen/5
+        # check health of enemy queen
+        e_health_score - items.enemy_queen/5
+
+        # add up health score
+        health_score = health_score + worker_health + drone_health + r_soldier_health + soldier_health
+
+        # add to score for own total amount of food
         my_food_count = items.my_food_count
         game_state_score += my_food_count / 44
 
+        # subtract from score for enemy total amount of food
         enemy_food_count = items.enemy_food_count
         game_state_score -= enemy_food_count / 44
+
+        # check how well protect own anthill is, add to score
+
+        # check how well protects own anthill is, subtract from score
 
         my_ants = items.my_ants
         for ant in my_ants:
