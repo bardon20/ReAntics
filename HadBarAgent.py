@@ -6,35 +6,35 @@ from Player import Player
 from typing import Dict, List
 
 
-# AIPlayer
-# Description: The responsibility of this class is to interact with the game by
-# deciding a valid move based on a given game state. This class has methods that
-# will be implemented by students in Dr. Nuxoll's AI course.
-#
-# Variables:
-#   playerId - The id of the player.
 class AIPlayer(Player):
-    # __init__
-    # Description: Creates a new Player
-    #
-    # Parameters:
-    #   inputPlayerId - The id to give the new player (int)
-    def __init__(self, input_player_id):
+    """
+    Class: AIPlayer
+    The Heuristic Search Agent for CS 421.
+
+    Authors: Alex Hadi and Reeca Bardon
+    Version: September 24, 2018
+    """
+
+    def __init__(self, input_player_id: int):
+        """
+        __init__
+
+        The constructor for AIPlayer (creates a new player).
+
+        :param input_player_id: The player's ID as an integer.
+        """
         super(AIPlayer, self).__init__(input_player_id, "HadBarAgent")
-    
-    # getPlacement
-    #
-    # Description: called during setup phase for each Construction that
-    #   must be placed by the player.  These items are: 1 Anthill on
-    #   the player's side; 1 tunnel on player's side; 9 grass on the
-    #   player's side; and 2 food on the enemy's side.
-    #
-    # Parameters:
-    #   construction - the Construction to be placed.
-    #   currentState - the state of the game at this point in time.
-    #
-    # Return: The coordinates of where the construction is to be placed
+
     def getPlacement(self, current_state):
+        """
+        Called during the setup phase for each Construction that must be placed by the player.
+        These items are: 1 Anthill on the player's side; 1 tunnel on player's side; 9 grass on the
+        player's side; and 2 food on the enemy's side.
+
+        :param current_state: The state of the game at this point in time.
+        :return: The coordinates of where the construction items should be placed.
+        """
+
         # implemented by students to return their next move
         if current_state.phase == SETUP_PHASE_1:    # stuff on my side
             num_to_place = 11
@@ -68,168 +68,271 @@ class AIPlayer(Player):
             return moves
         else:
             return [(0, 0)]
-    
-    # getMove
-    # Description: Gets the next move from the Player.
-    #
-    # Parameters:
-    #   currentState - The state of the current game waiting for the player's move (GameState)
-    #
-    # Return: The Move to be made
-    def getMove(self, current_state):
-        move = self.find_best_move(current_state, 0)
-        print(move)
-        return move
 
-    # getAttack
-    # Description: Gets the attack to be made from the Player
-    #
-    # Parameters:
-    #   currentState - A clone of the current state (GameState)
-    #   attackingAnt - The ant currently making the attack (Ant)
-    #   enemyLocation - The Locations of the Enemies that can be attacked (Location[])
-    ##
+    def getMove(self, current_state) -> Move:
+        """
+        getMove
+
+        Gets the next move from the player. The search tree is used to make this decision.
+
+        :param current_state: The state of the current game (GameState).
+        :return: The move to be made.
+        """
+        return self.find_best_move(current_state, 0)
+
     def getAttack(self, current_state, attacking_ant, enemy_locations):
-        # Attack a random enemy.
+        """
+        getAttack
+
+        Gets the attack to be made from the player.
+        Just attacks a random enemy.
+
+        :param current_state: A clone of the current state (GameState).
+        :param attacking_ant: The ant currently making the attack (Ant).
+        :param enemy_locations: The locations of the enemies that can be attacked (Location[])
+        :return:
+        """
         return enemy_locations[random.randint(0, len(enemy_locations) - 1)]
 
-    # registerWin
-    #
-    # This agent doesn't learn
-    #
     def registerWin(self, has_won):
-        # method template, not implemented
+        """
+        registerWin
+
+        This agent doesn't learn.
+
+        :param has_won: Whether the agent has won or not.
+        """
         pass
 
-    def examine_game_state_old(self, current_state: GameState) -> float:
-        items = Items(current_state)
+    def evaluate_game_state(self, current_state):
         game_state_score = 0.0
 
-        my_workers = items.my_workers
-        # check for each of own workers
-        num_workers_carrying = 0
-        for worker in my_workers:
-            # check if carrying food
-            if worker.carrying:
-                num_workers_carrying += 1
-            # add to score for each worker
-
-        if num_workers_carrying == len(my_workers):
-            game_state_score += 0.5
-        if len(my_workers) > 1:
-            game_state_score -= 0.2
-
-        '''
-        # check proximity of fighting ants to enemy workers
-        enemy_workers = items.enemy_workers
-        my_r_soldiers = items.my_r_soldiers
-        my_soldiers = items.my_soldiers
-        my_drones = items.my_drones
-        for e_worker in enemy_workers:
-            # check proximity of my drones to enemy workers
-            for drone in my_drones:
-                drone_prox = drone.coords - e_worker.coords
-                game_state_score += drone_prox / 5
-            # check proximity of my soldiers to enemy workers
-            for r_soldier in my_r_soldiers:
-                # Citation: https://stackoverflow.com/questions/29491220/print-difference-between-two-tuples
-                r_soldier_prox = stepsToReach(current_state, r_soldier.coords, e_worker.coords)   #set(r_soldier.coords) ^ set(e_worker.coords)
-                game_state_score += r_soldier_prox / 5
-            # check proximity of my range soldiers to enemy workers
-            for soldier in my_soldiers:
-                soldier_prox = soldier.coords - e_worker.coords
-                game_state_score += soldier_prox / 5
-                '''
-
-        # add to score for own total amount of food
-        my_food_count = items.my_food_count
-        game_state_score += my_food_count / 44
-
-        if game_state_score > 1.0:
-            game_state_score = 0.99
-        elif game_state_score < -1.0:
-            game_state_score = -0.99
-
-        winner = getWinner(current_state)
-        if winner is None:
-            return game_state_score
-        elif winner == 1:
-            return 1.0
-        else:
-            return -1.0
-
-    def examine_game_state(self, current_state):
         # Number of worker ants
         items = Items(current_state)
-        game_state_score = 0.0
 
+        my_soldiers = items.my_soldiers
+        my_r_soldiers = items.my_r_soldiers
+        my_drones = items.my_drones
         my_workers = items.my_workers
-        if len(my_workers) == 1 or len(my_workers) == 2:
-            game_state_score += 0.4
-
-        if len(my_workers) > 2:
-            game_state_score -= 0.1
-
-        if len(my_workers) == 0:
-            game_state_score -= 0.5
-
+        my_queen = items.my_queen
         my_anthill = items.my_anthill
         my_tunnel = items.my_tunnel
 
-        food_steps_to_reach_cases = {
-            0: 0.50,
-            1: 0.30,
-            2: 0.10,
-            3: -0.10
+        '''
+        ant_at_anthill = getAntAt(current_state, my_anthill.coords)
+        if ant_at_anthill and ant_at_anthill.type != WORKER:
+            return -0.99'''
+
+        ant_at_tunnel = getAntAt(current_state, my_tunnel.coords)
+        if ant_at_tunnel and ant_at_tunnel.type != WORKER:
+            return -0.99
+
+        if my_r_soldiers or my_drones:
+            return -0.99
+
+        my_food_count = items.my_food_count
+        if len(my_soldiers) > 1:
+            return -0.99
+
+        if len(my_workers) != 1:
+            return -0.99
+
+        approx_dist_worker = {
+            0: 0.80,
+            1: 0.60,
+            2: 0.40,
+            3: 0.30,
+            4: 0.20,
+            5: 0.10,
+            6: 0.00,
+            7: -0.10,
+            8: -0.20,
+            9: -0.30,
+            10: -0.40,
+            11: -0.60,
+            12: -0.80
         }
+
+        approx_dist_soldier = {
+            0: 0.00,
+            1: 0.56,
+            2: 0.47,
+            3: 0.35,
+            4: 0.21,
+            5: 0.15,
+            6: -0.10,
+            7: -0.25,
+            8: -0.30,
+            9: -0.35,
+            10: -0.40,
+            11: -0.45,
+            12: -0.50
+        }
+
+        '''
+        enemy_tunnel = items.enemy_tunnel
+        for soldier in my_soldiers:
+            dist_to_enemy_tunnel = approxDist(soldier.coords, enemy_tunnel.coords)
+            approx_dist_soldier.get(dist_to_enemy_tunnel, -0.35)
+        '''
+
+        enemy_workers = items.enemy_workers
+        if enemy_workers:
+            for soldier in my_soldiers:
+                dist_to_enemy_worker = approxDist(soldier.coords, enemy_workers[0].coords)
+                if dist_to_enemy_worker <= 1:
+                    if enemy_workers[0].coords in listAdjacent(soldier.coords):
+                        game_state_score += 0.5
+                else:
+                    game_state_score += approx_dist_soldier.get(dist_to_enemy_worker, -0.60)
+
         for worker in my_workers:
             if worker.carrying:
-                steps_to_tunnel = stepsToReach(current_state, worker.coords, my_tunnel.coords)
-                steps_to_anthill = stepsToReach(current_state, worker.coords, my_anthill.coords)
-
-                game_state_score += food_steps_to_reach_cases.get(min(steps_to_tunnel, steps_to_anthill), 0.00)
+                dist_to_tunnel = approxDist(worker.coords, my_tunnel.coords)
+                dist_to_anthill = approxDist(worker.coords, my_anthill.coords)
+                game_state_score += approx_dist_worker.get(min(dist_to_anthill, dist_to_tunnel), -0.80)
             else:
                 my_closest_food = items.my_closest_food
-                steps_to_closest_food = stepsToReach(current_state, worker.coords, my_closest_food.coords)
+                dist_to_closest_food = approxDist(worker.coords, my_closest_food.coords)
+                game_state_score += approx_dist_worker.get(dist_to_closest_food, -0.80)
 
-                game_state_score += food_steps_to_reach_cases.get(steps_to_closest_food, 0.00)
+        winner = getWinner(current_state)
+        if winner == 1:
+            return 1.0
+        elif winner == 0:
+            return -1.0
+
+        if game_state_score >= 1.0:
+            return 0.99
+        elif game_state_score <= -1.0:
+            return -0.99
         return game_state_score
 
     def find_best_move(self, current_state, current_depth):
-        DEPTH_LIMIT = 2
-        nodes: List[Node] = []
+        """
+        find_best_move                      <!-- RECURSIVE -->
+
+        The best move is found by recursively traversing the search tree.
+        An average of the evaluation scores is used to determine an overall score.
+
+        :param current_state: The current GameState.
+        :param current_depth: The current depth level in the tree.
+        :return: The Move that the agent wishes to perform.
+        """
+        # The children nodes are checked, so it goes to a depth limit of 2.
+        DEPTH_LIMIT = 1
         all_legal_moves = listAllLegalMoves(current_state)
+        all_nodes = []
+
         for move in all_legal_moves:
-            if move.moveType == END:
+            # Ignore the END_TURN move.
+            if move.moveType == "END_TURN":
                 continue
 
-            next_state = getNextState(current_state, move)
-            state_evaluation = self.examine_game_state(next_state)
-            node = Node(move, next_state, state_evaluation)
-
+            next_state_reached = self.getNextState(current_state, move)
+            node = Node(move, next_state_reached, self.evaluate_game_state(next_state_reached))
             if current_depth < DEPTH_LIMIT:
-                node.state_evaluation = self.find_best_move(next_state, current_depth + 1)
-            nodes.append(node)
+                node.state_evaluation = self.find_best_move(next_state_reached, current_depth + 1)
+            all_nodes.append(node)
 
-        highest_scoring_node = self.highest_scoring_node(nodes)
         if current_depth > 0:
-            return highest_scoring_node.state_evaluation
+            return self.average_evaluation_score(all_nodes)
         else:
-            return highest_scoring_node.move
+            # Citation: https://stackoverflow.com/questions/13067615/
+            # python-getting-the-max-value-of-y-from-a-list-of-objects
+            return max(all_nodes, key=lambda x: x.state_evaluation).move
 
-    def get_list_of_best_nodes(self, nodes: list) -> list:
-        NUM_BEST_NODES = 5
-        sorted_nodes = sorted(nodes, key=lambda node: node.state_evaluation, reverse=True)
-        return sorted_nodes[:NUM_BEST_NODES]
+    def average_evaluation_score(self, nodes: list) -> float:
+        """
+        Helper method to determine the overall evaluation score of a list of nodes.
+        The average method is used.
 
-    def highest_scoring_node(self, nodes: list):
-        # Citation: https://stackoverflow.com/questions/13067615/
-        # python-getting-the-max-value-of-y-from-a-list-of-objects
-        return max(nodes, key=lambda node: node.state_evaluation)
+        :param nodes: The list of nodes to check.
+        :return: The average evaluation score of all the checked nodes.
+        """
+        summation = 0
+        for node in nodes:
+            summation += node.state_evaluation
+        return summation / len(nodes)
+
+    def getNextState(self, currentState, move):
+        """
+        Revised version of getNextState from AIPlayerUtils.
+        Copied from Nux's email to the class.
+
+        :param currentState: The current GameState.
+        :param move: The move to be performed.
+        :return: The next GameState from the specified move.
+        """
+
+        # variables I will need
+        myGameState = currentState.fastclone()
+        myInv = getCurrPlayerInventory(myGameState)
+        me = myGameState.whoseTurn
+        myAnts = myInv.ants
+        myTunnels = myInv.getTunnels()
+        myAntHill = myInv.getAnthill()
+
+        # If enemy ant is on my anthill or tunnel update capture health
+        ant = getAntAt(myGameState, myAntHill.coords)
+        if ant is not None:
+            if ant.player != me:
+                myAntHill.captureHealth -= 1
+
+        # If an ant is built update list of ants
+        antTypes = [WORKER, DRONE, SOLDIER, R_SOLDIER]
+        if move.moveType == BUILD:
+            if move.buildType in antTypes:
+                ant = Ant(myInv.getAnthill().coords, move.buildType, me)
+                myInv.ants.append(ant)
+                # Update food count depending on ant built
+                if move.buildType == WORKER:
+                    myInv.foodCount -= 1
+                elif move.buildType == DRONE or move.buildType == R_SOLDIER:
+                    myInv.foodCount -= 2
+                elif move.buildType == SOLDIER:
+                    myInv.foodCount -= 3
+            # ants are no longer allowed to build tunnels, so this is an error
+            elif move.buildType == TUNNEL:
+                print("Attempted tunnel build in getNextState()")
+                return currentState
+
+        # If an ant is moved update their coordinates and has moved
+        elif move.moveType == MOVE_ANT:
+            newCoord = move.coordList[-1]
+            startingCoord = move.coordList[0]
+            for ant in myAnts:
+                if ant.coords == startingCoord:
+                    ant.coords = newCoord
+                    # TODO: should this be set true? Design decision
+                    ant.hasMoved = False
+                    attackable = listAttackable(ant.coords, UNIT_STATS[ant.type][RANGE])
+                    for coord in attackable:
+                        foundAnt = getAntAt(myGameState, coord)
+                        if foundAnt is not None:  # If ant is adjacent my ant
+                            if foundAnt.player != me:  # if the ant is not me
+                                foundAnt.health = foundAnt.health - UNIT_STATS[ant.type][
+                                    ATTACK]  # attack
+                                # If an enemy is attacked and looses all its health remove it from the other players
+                                # inventory
+                                if foundAnt.health <= 0:
+                                    myGameState.inventories[1 - me].ants.remove(foundAnt)
+                                # If attacked an ant already don't attack any more
+                                break
+        return myGameState
 
 
 class Node:
     def __init__(self, move: Move, state: GameState, state_evaluation: float):
+        """
+        Node
+
+        Class that represents a single node in the search tree.
+
+        :param move: The move that is taken from the parent node to the current node.
+        :param state: The resulting state of the move.
+        :param state_evaluation: The state evaluation score for the node.
+        """
         self.move = move
         self.state = state
         self.state_evaluation = state_evaluation
@@ -296,8 +399,9 @@ class Items:
         food_distances_dict: Dict[int, Construction] = {}
         foods = getConstrList(self._current_state, None, (FOOD,))
         for food in foods:
-            food_dist = stepsToReach(self._current_state, self.my_tunnel.coords, food.coords)
-            food_distances_dict[food_dist] = food
+            food_dist_to_tunnel = approxDist(self.my_tunnel.coords, food.coords)
+            food_dist_to_anthill = approxDist(self.my_anthill.coords, food.coords)
+            food_distances_dict[min(food_dist_to_anthill, food_dist_to_tunnel)] = food
 
         # Return the food that has the minimum cost to get to.
         return food_distances_dict[min(food_distances_dict)]
@@ -318,7 +422,7 @@ class Items:
 
         :return: My queen from my inventory.
         """
-        return getAntList(self._current_state, self._me, (QUEEN,))
+        return getAntList(self._current_state, self._me, (QUEEN,))[0]
 
     @property
     def my_workers(self) -> List[Ant]:
