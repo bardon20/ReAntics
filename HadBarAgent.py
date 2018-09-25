@@ -118,10 +118,9 @@ class AIPlayer(Player):
         my_anthill = items.my_anthill
         my_tunnel = items.my_tunnel
 
-        '''
         ant_at_anthill = getAntAt(current_state, my_anthill.coords)
         if ant_at_anthill and ant_at_anthill.type != WORKER:
-            return -0.99'''
+            return -0.99
 
         ant_at_tunnel = getAntAt(current_state, my_tunnel.coords)
         if ant_at_tunnel and ant_at_tunnel.type != WORKER:
@@ -130,14 +129,29 @@ class AIPlayer(Player):
         if my_r_soldiers or my_drones:
             return -0.99
 
+        food_count_rewards: Dict[int, float] = {
+            0: 0.00,
+            1: 0.10,
+            2: 0.20,
+            3: 0.30,
+            4: 0.40,
+            5: 0.50,
+            6: 0.60,
+            7: 0.70,
+            8: 0.80,
+            9: 0.90,
+            10: 1.00
+        }
         my_food_count = items.my_food_count
+        game_state_score += food_count_rewards.get(my_food_count, 0.00)
+
         if len(my_soldiers) > 1:
             return -0.99
 
         if len(my_workers) != 1:
             return -0.99
 
-        approx_dist_worker = {
+        worker_dist_rewards: Dict[int, float] = {
             0: 0.80,
             1: 0.60,
             2: 0.40,
@@ -153,7 +167,7 @@ class AIPlayer(Player):
             12: -0.80
         }
 
-        approx_dist_soldier = {
+        soldier_dist_rewards: Dict[int, float] = {
             0: 0.00,
             1: 0.56,
             2: 0.47,
@@ -172,7 +186,7 @@ class AIPlayer(Player):
         enemy_tunnel = items.enemy_tunnel
         for soldier in my_soldiers:
             dist_to_enemy_tunnel = approxDist(soldier.coords, enemy_tunnel.coords)
-            approx_dist_soldier.get(dist_to_enemy_tunnel, -0.35)
+            soldier_dist_rewards.get(dist_to_enemy_tunnel, -0.35)
 
         enemy_workers = items.enemy_workers
         if enemy_workers:
@@ -182,19 +196,22 @@ class AIPlayer(Player):
                     if enemy_workers[0].coords in listAdjacent(soldier.coords):
                         game_state_score += 0.5
                 else:
-                    game_state_score += approx_dist_soldier.get(dist_to_enemy_worker, -0.60)
+                    game_state_score += soldier_dist_rewards.get(dist_to_enemy_worker, -0.60)
 
         if approxDist(my_anthill.coords, my_queen.coords) == 0:
             game_state_score -= .99
         for worker in my_workers:
+            dist_to_tunnel = approxDist(worker.coords, my_tunnel.coords)
+            dist_to_anthill = approxDist(worker.coords, my_anthill.coords)
+            closest_construction = min(dist_to_anthill, dist_to_tunnel)
             if worker.carrying:
-                dist_to_tunnel = approxDist(worker.coords, my_tunnel.coords)
-                dist_to_anthill = approxDist(worker.coords, my_anthill.coords)
-                game_state_score += approx_dist_worker.get(min(dist_to_anthill, dist_to_tunnel), -0.80)
+                game_state_score += worker_dist_rewards.get(closest_construction, -0.80)
             else:
+                if closest_construction == 0:
+                    game_state_score -= 0.50
                 my_closest_food = items.my_closest_food
                 dist_to_closest_food = approxDist(worker.coords, my_closest_food.coords)
-                game_state_score += approx_dist_worker.get(dist_to_closest_food, -0.80)
+                game_state_score += worker_dist_rewards.get(dist_to_closest_food, -0.80)
 
         winner = getWinner(current_state)
         if winner == 1:
@@ -208,9 +225,9 @@ class AIPlayer(Player):
             return -0.99
         return game_state_score
 
-    def find_best_move(self, current_state, current_depth):
+    def find_best_move(self, current_state: GameState, current_depth: int):
         """
-        find_best_move                      <!-- RECURSIVE -->
+        find_best_move                  <!-- RECURSIVE -->
 
         The best move is found by recursively traversing the search tree.
         An average of the evaluation scores is used to determine an overall score.
@@ -221,8 +238,8 @@ class AIPlayer(Player):
         """
         # The children nodes are checked, so it goes to a depth limit of 2.
         DEPTH_LIMIT = 1
-        all_legal_moves = listAllLegalMoves(current_state)
-        all_nodes = []
+        all_legal_moves: List[Move] = listAllLegalMoves(current_state)
+        all_nodes: List[Node] = []
 
         for move in all_legal_moves:
             # Ignore the END_TURN move.
@@ -250,16 +267,13 @@ class AIPlayer(Player):
         :param nodes: The list of nodes to check.
         :return: The average evaluation score of all the checked nodes.
         """
-        summation = 0
-        for node in nodes:
-            summation += node.state_evaluation
-        return summation / len(nodes)
+        return sum(node.state_evaluation for node in nodes) / len(nodes)
 
     def getNextState(self, currentState, move):
         """
         Revised version of getNextState from AIPlayerUtils.
         Copied from Nux's email to the class.
-
+        
         :param currentState: The current GameState.
         :param move: The move to be performed.
         :return: The next GameState from the specified move.
