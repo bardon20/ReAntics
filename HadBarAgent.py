@@ -169,10 +169,8 @@ class AIPlayer(Player):
             12: -0.50
         }
 
-        enemy_tunnel = items.enemy_tunnel
-        for soldier in my_soldiers:
-            dist_to_enemy_tunnel = approxDist(soldier.coords, enemy_tunnel.coords)
-            approx_dist_soldier.get(dist_to_enemy_tunnel, -0.35)
+        # get distance between attakcing ants and enemy worker
+        # attack the enemy workers
         enemy_workers = items.enemy_workers
         if enemy_workers:
             for soldier in my_soldiers:
@@ -184,8 +182,10 @@ class AIPlayer(Player):
                 else:
                     game_state_score += approx_dist_soldier.get(dist_to_enemy_worker, -0.60)
 
+        # stop queen from sitting on anthill
         if approxDist(my_anthill.coords, my_queen.coords) == 0:
             game_state_score -= .99
+        # have workers get food
         for worker in my_workers:
             if worker.carrying:
                 dist_to_tunnel = approxDist(worker.coords, my_tunnel.coords)
@@ -196,12 +196,14 @@ class AIPlayer(Player):
                 dist_to_closest_food = approxDist(worker.coords, my_closest_food.coords)
                 game_state_score += approx_dist_worker.get(dist_to_closest_food, -0.80)
 
+        # check if there is a winner
         winner = getWinner(current_state)
         if winner == 1:
             return 1.0
         elif winner == 0:
             return -1.0
 
+        # make sure returning valid number
         if game_state_score >= 1.0:
             return 0.99
         elif game_state_score <= -1.0:
