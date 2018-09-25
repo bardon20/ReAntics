@@ -133,157 +133,42 @@ class AIPlayer(Player):
         return random.uniform(-1.0, 1.0)
         game_state_score = 0.0
         items = Items(current_state)
-        food_score=0
-        health_score=0
-
-        my_queen = items.my_queen
 
         my_workers = items.my_workers
-        worker_health=0
         # check for each of own workers
         for worker in my_workers:
-            # check the health
-            worker_health -= worker.health/5
             # check if carrying food
             if worker.carrying:
                 food_score += 0.01
             # add to score for each worker
             game_state_score += 0.1
 
-        # same for enemy workers
+        # check proximity of fighting ants to enemy workers
         enemy_workers = items.enemy_workers
-        for e_worker in enemy_workers:
-            # check health
-            worker_health -= e_worker.health/5
-            # check if carrying food
-            if e_worker.carrying:
-                food_score -= 0.01
-            # subtract from score for each worker
-            game_state_score -= 0.1
-
-        # check each for each of own drones
-        my_drones = items.my_drones
-        drone_health=0
-        for drone in my_drones:
-            # check health
-            drone_health += drone.health/5
-            # check proximity to queen/anthill
-            drone_prox = (drone.coords - items.enemy_queen) + (drone.coords - items.enemy_anthill)
-            game_state_score += drone_prox/5
-            # add to score for each drone
-            game_state_score += 0.1
-
-        # same for enemy drones
-        enemy_drones = items.enemy_drones
-        for e_drone in enemy_drones:
-            # check health
-            drone_health -= e_drone.health/5
-            # check proximity to queen/anthill
-            e_drone_prox = (e_drone.coords - items.my_queen) + (e_drone.coords - items.my_anthill)
-            game_state_score -= e_drone_prox / 5
-            # subtract from score for each drone
-            game_state_score -= 0.1
-
-        # check each of own range soldiers
-        r_soldier_health = 0
         my_r_soldiers = items.my_r_soldiers
-        for r_soldier in my_r_soldiers:
-            # check health
-            r_soldier_health += r_soldier.health/5
-            # check for proximity fo anthill/queen
-            r_soldier_prox = (r_soldier.coords - items.enemy_anthill) + (r_soldier.coords - items.enemy_queen)
-            game_state_score += r_soldier_prox/5
-            # update score for each soldier
-            game_state_score += 0.1
-
-        # same for enemy range soldiers
-        enemy_r_soldiers = items.enemy_r_soldiers
-        for e_r_soldier in enemy_r_soldiers:
-            # check health
-            r_soldier_health -= e_r_soldier.health / 5
-            # check proximity fo anthill/queen
-            e_r_soldier_prox = (e_r_soldier.coords - items.my_anthill) + (e_r_soldier.coords - items.my_queen)
-            game_state_score -= r_soldier_prox / 5
-            # subtract from score for each range soldier
-            game_state_score -= 0.1
-
-        # check each of own soldiers
         my_soldiers = items.my_soldiers
-        soldier_health=0
-        for soldier in my_soldiers:
-            # check health
-            soldier_health += soldier.health / 5
-            # check for proximity fo anthill/queen
-            soldier_prox = (soldier.coords - items.enemy_anthill) + (soldier.coords - items.enemy_queen)
-            game_state_score += soldier_prox / 5
-            # update score for each soldier
-            game_state_score += 0.1
-
-        # same for enemy soldiers
-        enemy_soldiers = items.enemy_soldiers
-        for e_soldier in enemy_soldiers:
-            # check health
-            soldier_health -= e_soldier.health / 5
-            # check proximity to queen
-            e_soldier_prox = (e_soldier.coords - items.my_anthill) + (e_soldier.coords - items.my_queen)
-            game_state_score += e_soldier_prox / 5
-            # subtract from score for each range soldier
-            game_state_score -= 0.1
-
-        # check health of own queen minus enemy's queen
-        health_score = items.my_queen.health/5 - items.enemy_queen.health/5
-
-        # add up health score
-        health_score += worker_health + drone_health + r_soldier_health + soldier_health
+        my_drones = items.my_drones
+        for e_worker in enemy_workers:
+            # check proximity of my drones to enemy workers
+            for drone in my_drones:
+                drone_prox = drone.coords - e_worker.coords
+                game_state_score += drone_prox / 5
+            # check proximity of my soldiers to enemy workers
+            for r_soldier in my_r_soldiers:
+                r_soldier_prox = r_soldier.coords - e_worker.coords
+                game_state_score += r_soldier_prox / 5
+            # check proximity of my range soldiers to enemy workers
+            for soldier in my_soldiers:
+                soldier_prox = soldier.coords - e_worker.coords
+                game_state_score += soldier_prox / 5
 
         # add to score for own total amount of food
         my_food_count = items.my_food_count
         game_state_score += my_food_count / 44
 
-        # subtract from score for enemy total amount of food
-        enemy_food_count = items.enemy_food_count
-        game_state_score -= enemy_food_count / 44
-
-        # check grass around own anthill
-        my_anthill_grass = getConstrList(current_state, GRASS)
-        for grass in my_anthill_grass:
-            game_state_score += (grass.coords - items.my_anthill)/5
-
-        # check grass around enemy anthill
-        enemy_anthill_grass = getConstrList(current_state, GRASS)
-        for grass in enemy_anthill_grass:
-            game_state_score -= (grass.coords - items.enemy_anthill) / 5
-
-        # add food and health score to total score
-        game_state_score += health_score + food_score
-
         my_ants = items.my_ants
         for ant in my_ants:
             pass
-
-        # How threatened the queen is
-        # check how well protect own anthill is
-        enemy_fighters = enemy_drones + enemy_soldiers + enemy_r_soldiers
-        for fighter in enemy_fighters:
-            # check grass
-            steps_to_queen = stepsToReach(current_state, fighter, my_queen.coords)
-            steps_to_anthill = stepsToReach(current_state, fighter, items.my_anthill.coords)
-            if steps_to_queen < 2:
-                game_state_score -= 0.1
-            if steps_to_anthill < 2:
-                game_state_score -=0.1
-
-        # how threatened enemy queens is
-        # check how well protected enemy anthill is protected
-        my_fighters = my_drones + my_r_soldiers + my_soldiers
-        for fighter in my_fighters:
-            # check grass
-            steps_to_e_queen = stepsToReach(current_state, fighter, my_queen.coords)
-            steps_to_e_anthill = stepsToReach(current_state, fighter, items.enemy_anthill.coords)
-            if steps_to_e_queen < 2:
-                game_state_score += 0.1
-            if steps_to_e_anthill < 2:
-                game_state_score += 0.1
 
         if game_state_score > 1.0:
             game_state_score = 0.99
