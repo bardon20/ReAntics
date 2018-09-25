@@ -248,6 +248,8 @@ class AIPlayer(Player):
 
             next_state_reached = self.getNextState(current_state, move)
             node = Node(move, next_state_reached, self.evaluate_game_state(next_state_reached))
+
+            # Recursively goes through the search tree.
             if current_depth < DEPTH_LIMIT:
                 node.state_evaluation = self.find_best_move(next_state_reached, current_depth + 1)
             all_nodes.append(node)
@@ -413,6 +415,7 @@ class Items:
         food_distances_dict: Dict[int, Construction] = {}
         foods = getConstrList(self._current_state, None, (FOOD,))
         for food in foods:
+            # Want the food closest to either the tunnel or anthill.
             food_dist_to_tunnel = approxDist(self.my_tunnel.coords, food.coords)
             food_dist_to_anthill = approxDist(self.my_anthill.coords, food.coords)
             food_distances_dict[min(food_dist_to_anthill, food_dist_to_tunnel)] = food
