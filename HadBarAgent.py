@@ -77,12 +77,7 @@ class AIPlayer(Player):
     #
     # Return: The Move to be made
     def getMove(self, current_state):
-        move = self.find_best_move(current_state, 0, None)
-        if move:
-            pass
-        if not move:
-            pass
-        return move
+        return self.find_best_move(current_state, 0, None)
 
     # getAttack
     # Description: Gets the attack to be made from the Player
@@ -135,6 +130,7 @@ class AIPlayer(Player):
         pass
 
     def examine_game_state(self, current_state: GameState) -> float:
+        return random.uniform(-1.0, 1.0)
         game_state_score = 0.0
         items = Items(current_state)
         food_score=0
@@ -302,7 +298,6 @@ class AIPlayer(Player):
         else:
             return -1.0
 
-
     def find_best_move(self, current_state, current_depth, parent_node):
         DEPTH_LIMIT = 1
         nodes: List[Node] = []
@@ -316,28 +311,18 @@ class AIPlayer(Player):
                 node.state_evaluation = self.find_best_move(next_state, current_depth + 1, node)
             nodes.append(node)
 
-        #highest_scoring_node = self.highest_scoring_node(nodes)
+        highest_scoring_node = self.highest_scoring_node(nodes)
         if current_depth > 0:
-            maxval = -100
-            for n in nodes:
-                if n.state_evaluation > maxval:
-                    maxval = n.state_evaluation
-            return maxval
-        else:
-            maxval = -100
-            maxmove = None
-            for n in nodes:
-                if n.state_evaluation > maxval:
-                    maxval = n.state_evaluation
-                    maxmove = n.move
-            return maxmove
+            return highest_scoring_node.state_evaluation
+        elif current_depth == 0:
+            return highest_scoring_node.move
 
     def highest_scoring_node(self, nodes: list):
         # Citation: https://stackoverflow.com/questions/13067615/
         # python-getting-the-max-value-of-y-from-a-list-of-objects
         return max(nodes, key=lambda node: node.state_evaluation)
 
-    def all_possible_moves(self, current_state):
+    def all_possible_moves(self, current_state) -> List[Move]:
         all_legal_moves = []
         all_legal_moves.extend(listAllMovementMoves(current_state))
         all_legal_moves.extend(listAllBuildMoves(current_state))
