@@ -301,8 +301,11 @@ class AIPlayer(Player):
     def find_best_move(self, current_state, current_depth, parent_node):
         DEPTH_LIMIT = 1
         nodes: List[Node] = []
-        all_legal_moves = self.all_possible_moves(current_state)
+        all_legal_moves = listAllLegalMoves(current_state)
         for move in all_legal_moves:
+            if move.moveType == "END_TURN":
+                continue
+
             next_state = getNextState(current_state, move)
             state_evaluation = self.examine_game_state(next_state)
             node = Node(move, next_state, state_evaluation, parent_node)
@@ -321,12 +324,6 @@ class AIPlayer(Player):
         # Citation: https://stackoverflow.com/questions/13067615/
         # python-getting-the-max-value-of-y-from-a-list-of-objects
         return max(nodes, key=lambda node: node.state_evaluation)
-
-    def all_possible_moves(self, current_state) -> List[Move]:
-        all_legal_moves = []
-        all_legal_moves.extend(listAllMovementMoves(current_state))
-        all_legal_moves.extend(listAllBuildMoves(current_state))
-        return all_legal_moves
 
 
 class Node:
