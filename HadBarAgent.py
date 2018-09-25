@@ -301,24 +301,36 @@ class AIPlayer(Player):
     def find_best_move(self, current_state, current_depth, parent_node):
         DEPTH_LIMIT = 1
         nodes: List[Node] = []
-        all_legal_moves = listAllLegalMoves(current_state)
+        all_legal_moves: List[Move] = listAllLegalMoves(current_state)
+        move_next_state: Dict[Move, GameState] = {}
         for move in all_legal_moves:
-            if move.moveType == "END_TURN":
+            if move.moveType == END:
                 continue
 
             next_state = getNextState(current_state, move)
             state_evaluation = self.examine_game_state(next_state)
             node = Node(move, next_state, state_evaluation, parent_node)
-
-            if current_depth < DEPTH_LIMIT:
-                node.state_evaluation = self.find_best_move(next_state, current_depth + 1, node)
+            move_next_state[move] = next_state
             nodes.append(node)
 
-        highest_scoring_node = self.highest_scoring_node(nodes)
+        best_nodes = self.get_list_of_best_nodes(nodes)
+        if current_depth < DEPTH_LIMIT:
+            for node in best_nodes:
+                node.state_evaluation =\
+                    self.find_best_move(move_next_state[node.move], current_depth + 1, node)
+
+        highest_scoring_node = self.highest_scoring_node(best_nodes)
         if current_depth > 0:
             return highest_scoring_node.state_evaluation
         elif current_depth == 0:
             return highest_scoring_node.move
+
+    def get_list_of_best_nodes(self, nodes: list) -> list:
+        NUM_BEST_NODES = 5
+        best_nodes: List[Node] = []
+        for _ in range(NUM_BEST_NODES):
+            best_nodes.append(max(nodes, key=lambda node: node.state_evaluation))
+        return best_nodes
 
     def highest_scoring_node(self, nodes: list):
         # Citation: https://stackoverflow.com/questions/13067615/
