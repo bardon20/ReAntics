@@ -169,12 +169,10 @@ class AIPlayer(Player):
             12: -0.50
         }
 
-        '''
         enemy_tunnel = items.enemy_tunnel
         for soldier in my_soldiers:
             dist_to_enemy_tunnel = approxDist(soldier.coords, enemy_tunnel.coords)
             approx_dist_soldier.get(dist_to_enemy_tunnel, -0.35)
-        '''
 
         enemy_workers = items.enemy_workers
         if enemy_workers:
@@ -186,6 +184,8 @@ class AIPlayer(Player):
                 else:
                     game_state_score += approx_dist_soldier.get(dist_to_enemy_worker, -0.60)
 
+        if approxDist(my_anthill.coords, my_queen.coords) == 0:
+            game_state_score -= .99
         for worker in my_workers:
             if worker.carrying:
                 dist_to_tunnel = approxDist(worker.coords, my_tunnel.coords)
