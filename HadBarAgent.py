@@ -77,7 +77,9 @@ class AIPlayer(Player):
     #
     # Return: The Move to be made
     def getMove(self, current_state):
-        return self.find_best_move(current_state, 0)
+        move = self.find_best_move(current_state, 0)
+        print(move)
+        return move
 
     # getAttack
     # Description: Gets the attack to be made from the Player
@@ -99,50 +101,25 @@ class AIPlayer(Player):
         # method template, not implemented
         pass
 
-    def score_number_of_ants(self, current_state):
-        # If more than enemy or not
-        pass
-
-    def score_ant_types(self, current_state):
-        # Multiplier for differing types of ants
-        # Soldier/r-soldier: x3
-        # Drone: x2
-        # Worker: x1
-
-        # If you have more ___ than ___ (specific types)
-        pass
-
-    def score_ant_health(self, current_state):
-        # If you have more health or not
-        pass
-
-    def score_food(self, current_state):
-
-        pass
-
-    def score_queen_threatened(self, current_state):
-        # Use steps to reach on enemy fighters
-        pass
-
-    def score_anthill_protected(self, current_state):
-        # How much grass around
-        # how many attacking ants are around anthill
-        pass
-
-    def examine_game_state(self, current_state: GameState) -> float:
-        return random.uniform(-1.0, 1.0)
-        game_state_score = 0.0
+    def examine_game_state_old(self, current_state: GameState) -> float:
         items = Items(current_state)
+        game_state_score = 0.0
 
         my_workers = items.my_workers
         # check for each of own workers
+        num_workers_carrying = 0
         for worker in my_workers:
             # check if carrying food
             if worker.carrying:
-                food_score += 0.01
+                num_workers_carrying += 1
             # add to score for each worker
-            game_state_score += 0.1
 
+        if num_workers_carrying == len(my_workers):
+            game_state_score += 0.5
+        if len(my_workers) > 1:
+            game_state_score -= 0.2
+
+        '''
         # check proximity of fighting ants to enemy workers
         enemy_workers = items.enemy_workers
         my_r_soldiers = items.my_r_soldiers
@@ -155,20 +132,18 @@ class AIPlayer(Player):
                 game_state_score += drone_prox / 5
             # check proximity of my soldiers to enemy workers
             for r_soldier in my_r_soldiers:
-                r_soldier_prox = r_soldier.coords - e_worker.coords
+                # Citation: https://stackoverflow.com/questions/29491220/print-difference-between-two-tuples
+                r_soldier_prox = stepsToReach(current_state, r_soldier.coords, e_worker.coords)   #set(r_soldier.coords) ^ set(e_worker.coords)
                 game_state_score += r_soldier_prox / 5
             # check proximity of my range soldiers to enemy workers
             for soldier in my_soldiers:
                 soldier_prox = soldier.coords - e_worker.coords
                 game_state_score += soldier_prox / 5
+                '''
 
         # add to score for own total amount of food
         my_food_count = items.my_food_count
         game_state_score += my_food_count / 44
-
-        my_ants = items.my_ants
-        for ant in my_ants:
-            pass
 
         if game_state_score > 1.0:
             game_state_score = 0.99
@@ -183,40 +158,68 @@ class AIPlayer(Player):
         else:
             return -1.0
 
+    def examine_game_state(self, current_state):
+        # Number of worker ants
+        items = Items(current_state)
+        game_state_score = 0.0
+
+        my_workers = items.my_workers
+        if len(my_workers) == 1 or len(my_workers) == 2:
+            game_state_score += 0.4
+
+        if len(my_workers) > 2:
+            game_state_score -= 0.1
+
+        if len(my_workers) == 0:
+            game_state_score -= 0.5
+
+        my_anthill = items.my_anthill
+        my_tunnel = items.my_tunnel
+
+        food_steps_to_reach_cases = {
+            0: 0.50,
+            1: 0.30,
+            2: 0.10,
+            3: -0.10
+        }
+        for worker in my_workers:
+            if worker.carrying:
+                steps_to_tunnel = stepsToReach(current_state, worker.coords, my_tunnel.coords)
+                steps_to_anthill = stepsToReach(current_state, worker.coords, my_anthill.coords)
+
+                game_state_score += food_steps_to_reach_cases.get(min(steps_to_tunnel, steps_to_anthill), 0.00)
+            else:
+                my_closest_food = items.my_closest_food
+                steps_to_closest_food = stepsToReach(current_state, worker.coords, my_closest_food.coords)
+
+                game_state_score += food_steps_to_reach_cases.get(steps_to_closest_food, 0.00)
+        return game_state_score
+
     def find_best_move(self, current_state, current_depth):
-        DEPTH_LIMIT = 1
+        DEPTH_LIMIT = 2
         nodes: List[Node] = []
-        all_legal_moves: List[Move] = listAllLegalMoves(current_state)
-        move_next_state: Dict[Move, GameState] = {}
+        all_legal_moves = listAllLegalMoves(current_state)
         for move in all_legal_moves:
             if move.moveType == END:
                 continue
+
             next_state = getNextState(current_state, move)
             state_evaluation = self.examine_game_state(next_state)
             node = Node(move, next_state, state_evaluation)
-            move_next_state[move] = next_state
 
             if current_depth < DEPTH_LIMIT:
-                node.state_evaluation = self.find_best_move(current_state, current_depth + 1)
+                node.state_evaluation = self.find_best_move(next_state, current_depth + 1)
             nodes.append(node)
-
-        '''
-        best_nodes = self.get_list_of_best_nodes(nodes)
-        if current_depth < DEPTH_LIMIT:
-            for high_node in best_nodes:
-                high_node.state_evaluation = self.find_best_move(move_next_state[high_node.move], current_depth + 1)
-                '''
 
         highest_scoring_node = self.highest_scoring_node(nodes)
         if current_depth > 0:
             return highest_scoring_node.state_evaluation
-        elif current_depth == 0:
+        else:
             return highest_scoring_node.move
 
     def get_list_of_best_nodes(self, nodes: list) -> list:
         NUM_BEST_NODES = 5
         sorted_nodes = sorted(nodes, key=lambda node: node.state_evaluation, reverse=True)
-        print(sorted_nodes)
         return sorted_nodes[:NUM_BEST_NODES]
 
     def highest_scoring_node(self, nodes: list):
@@ -277,6 +280,10 @@ class Items:
         :return: The amount of food that the enemy currently has.
         """
         return self._enemy_inventory.foodCount
+
+    @property
+    def my_food(self) -> List[Construction]:
+        return getConstrList(self._current_state, None, (FOOD,))
 
     @property
     def my_closest_food(self) -> Construction:
