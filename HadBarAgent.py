@@ -77,7 +77,7 @@ class AIPlayer(Player):
     #
     # Return: The Move to be made
     def getMove(self, current_state):
-        return self.find_best_move(current_state, 0, None)
+        return self.find_best_move(current_state, 0)
 
     # getAttack
     # Description: Gets the attack to be made from the Player
@@ -183,7 +183,7 @@ class AIPlayer(Player):
         else:
             return -1.0
 
-    def find_best_move(self, current_state, current_depth, parent_node):
+    def find_best_move(self, current_state, current_depth):
         DEPTH_LIMIT = 1
         nodes: List[Node] = []
         all_legal_moves: List[Move] = listAllLegalMoves(current_state)
@@ -191,20 +191,23 @@ class AIPlayer(Player):
         for move in all_legal_moves:
             if move.moveType == END:
                 continue
-
             next_state = getNextState(current_state, move)
             state_evaluation = self.examine_game_state(next_state)
-            node = Node(move, next_state, state_evaluation, parent_node)
+            node = Node(move, next_state, state_evaluation)
             move_next_state[move] = next_state
+
+            if current_depth < DEPTH_LIMIT:
+                node.state_evaluation = self.find_best_move(current_state, current_depth + 1)
             nodes.append(node)
 
+        '''
         best_nodes = self.get_list_of_best_nodes(nodes)
         if current_depth < DEPTH_LIMIT:
-            for node in best_nodes:
-                node.state_evaluation =\
-                    self.find_best_move(move_next_state[node.move], current_depth + 1, node)
+            for high_node in best_nodes:
+                high_node.state_evaluation = self.find_best_move(move_next_state[high_node.move], current_depth + 1)
+                '''
 
-        highest_scoring_node = self.highest_scoring_node(best_nodes)
+        highest_scoring_node = self.highest_scoring_node(nodes)
         if current_depth > 0:
             return highest_scoring_node.state_evaluation
         elif current_depth == 0:
@@ -212,10 +215,9 @@ class AIPlayer(Player):
 
     def get_list_of_best_nodes(self, nodes: list) -> list:
         NUM_BEST_NODES = 5
-        best_nodes: List[Node] = []
-        for _ in range(NUM_BEST_NODES):
-            best_nodes.append(max(nodes, key=lambda node: node.state_evaluation))
-        return best_nodes
+        sorted_nodes = sorted(nodes, key=lambda node: node.state_evaluation, reverse=True)
+        print(sorted_nodes)
+        return sorted_nodes[:NUM_BEST_NODES]
 
     def highest_scoring_node(self, nodes: list):
         # Citation: https://stackoverflow.com/questions/13067615/
@@ -224,11 +226,10 @@ class AIPlayer(Player):
 
 
 class Node:
-    def __init__(self, move: Move, state: GameState, state_evaluation: float, parent_node):
+    def __init__(self, move: Move, state: GameState, state_evaluation: float):
         self.move = move
         self.state = state
         self.state_evaluation = state_evaluation
-        self.parent_node = parent_node
 
 
 class Items:
