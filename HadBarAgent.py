@@ -104,26 +104,18 @@ class AIPlayer(Player):
         """
         pass
 
-    def _has_unwanted_conditions(self, current_state: GameState, my_anthill: Construction,
-                                 my_workers: List[Ant], my_drones: List[Ant],
+    def _has_unwanted_conditions(self, my_workers: List[Ant], my_drones: List[Ant],
                                  my_soldiers: List[Ant], my_r_soldiers: List[Ant]) -> bool:
         """
         Helper function that checks for unwanted conditions in the GameState.
         If these exist, my agent will evaluate the game state at -0.99.
 
-        :param current_state: The current GameState.
-        :param my_anthill: My anthill.
         :param my_workers: My tunnel.
         :param my_drones: The list of my drones.
         :param my_soldiers: The list of my soldiers.
         :param my_r_soldiers: The list of my ranged soldiers.
         :return: True (unwanted condition exist), otherwise False.
         """
-
-        # To get the queen (and anything else besides the worker) off my anthill.
-        ant_at_anthill = getAntAt(current_state, my_anthill.coords)
-        if ant_at_anthill and ant_at_anthill.type != WORKER:
-            return True
 
         # Want one worker no matter what.
         if len(my_workers) != 1:
@@ -135,7 +127,7 @@ class AIPlayer(Player):
             return True
         return False
 
-    def _gather_food(self, dist_rewards: Dict[int, float],
+    def _gather_food(self, dist_rewards: Dict[int, float], current_state: GameState,
                      my_closest_food: Construction, my_workers: List[Ant],
                      my_anthill: Construction, my_tunnel: Construction) -> float:
         """
@@ -144,6 +136,7 @@ class AIPlayer(Player):
         Helper function that rewards (or punishes) the agent if my workers get (or don't get) food.
 
         :param dist_rewards: The dictionary of rewards and punishments for given distances.
+        :param current_state: The current GameState object.
         :param my_closest_food: The closest food to my anthill or tunnel.
         :param my_workers: The list of my workers.
         :param my_anthill: My anthill.
@@ -152,6 +145,11 @@ class AIPlayer(Player):
         """
 
         evaluation_score_delta = 0.0
+
+        # To get the queen (and anything else besides the worker) off my anthill.
+        ant_at_anthill = getAntAt(current_state, my_anthill.coords)
+        if ant_at_anthill and ant_at_anthill.type != WORKER:
+            evaluation_score_delta -= 1.00
 
         # The worker doesn't get rewarded or punished by default.
         DEFAULT_WORKER_REWARD = 0.00
@@ -189,12 +187,13 @@ class AIPlayer(Player):
         # Punish the drone by default (otherwise use dist_rewards dictionary).
         DEFAULT_DRONE_REWARD = -0.60
 
-        # Punish the agent if the enemy has any workers.
-        if enemy_workers:
-            evaluation_score_delta -= 1.00
+        # Punish the agent if the enemy has one worker
+        if len(enemy_workers) == 1:
+            evaluation_score_delta -= 0.85
 
         # Rewards (or punishes) the agent for getting my drone close to the enemy worker.
-        if enemy_workers:
+        # Only cares if there is exactly one worker.
+        if len(enemy_workers) == 1:
             for drone in my_drones:
                 dist_to_worker = approxDist(drone.coords, enemy_workers[0].coords)
                 evaluation_score_delta += dist_rewards.get(dist_to_worker, DEFAULT_DRONE_REWARD)
@@ -205,6 +204,7 @@ class AIPlayer(Player):
         evaluate_game_state
 
         Given a game state, calculates an evaluation score between -1.0 and 1.0.
+        The agent's main objectives are to gather food and kill the enemy worker.
 
         :param current_state: The current game state.
         :return: The evaluation score (float)
@@ -225,10 +225,10 @@ class AIPlayer(Player):
 
         # All the distance costs for the drone and worker.
         dist_rewards: Dict[int, float] = {
-            0: 0.80,
-            1: 0.65,
-            2: 0.50,
-            3: 0.35,
+            0: 0.70,
+            1: 0.55,
+            2: 0.40,
+            3: 0.30,
             4: 0.20,
             5: 0.00,
             6: -0.15,
@@ -238,13 +238,12 @@ class AIPlayer(Player):
         }
 
         # Just return -0.99 if an unwanted condition exists in the GameState.
-        if self._has_unwanted_conditions(current_state, my_anthill, my_workers, my_drones,
-                                         my_soldiers, my_r_soldiers):
+        if self._has_unwanted_conditions(my_workers, my_drones, my_soldiers, my_r_soldiers):
             return -0.99
 
         # Agent is rewarded for gathering food and killing the enemy workers.
-        evaluation_score += self._gather_food(dist_rewards, my_closest_food, my_workers,
-                                              my_anthill, my_tunnel)
+        evaluation_score += self._gather_food(dist_rewards, current_state, my_closest_food,
+                                              my_workers, my_anthill, my_tunnel)
         evaluation_score += self._kill_enemy_workers(dist_rewards, my_drones, enemy_workers)
 
         # Check if there is a winner
@@ -286,7 +285,7 @@ class AIPlayer(Player):
             node = Node(move, next_state_reached, self.evaluate_game_state(next_state_reached))
             all_nodes.append(node)
 
-        best_nodes = self.get_best_nodes(all_nodes)
+        best_nodes = self._get_best_nodes(all_nodes)
         if current_depth < DEPTH_LIMIT:
             for i, node in enumerate(best_nodes):
                 best_nodes[i].state_evaluation = self.find_best_move(node.state, current_depth + 1)
@@ -298,11 +297,11 @@ class AIPlayer(Player):
             # python-getting-the-max-value-of-y-from-a-list-of-objects
             return max(best_nodes, key=lambda x: x.state_evaluation).move
 
-    def get_best_nodes(self, nodes: list) -> list:
+    def _get_best_nodes(self, nodes: list) -> list:
         """
-        get_best_nodes
+        _get_best_nodes
 
-        Used for finding the best nodes to prune the tree properly.
+        Helper function used for finding the best nodes to prune the tree properly.
 
         :param nodes: The list of nodes to check.
         :return: The best nodes (number determined by NUM_BEST_NODES constant).
@@ -379,7 +378,8 @@ class AIPlayer(Player):
                             if foundAnt.player != me:  # if the ant is not me
                                 foundAnt.health = foundAnt.health - UNIT_STATS[ant.type][
                                     ATTACK]  # attack
-                                # If an enemy is attacked and looses all its health remove it from the other players
+                                # If an enemy is attacked and loses all its health
+                                # remove it from the other players
                                 # inventory
                                 if foundAnt.health <= 0:
                                     myGameState.inventories[1 - me].ants.remove(foundAnt)
@@ -544,3 +544,83 @@ class Items:
         :return: A list of the enemy's workers.
         """
         return getAntList(self._current_state, self._enemy, (WORKER,))
+
+
+def create_test_game_state() -> GameState:
+    """
+    create_test_game_state
+
+    Creates the test game state to use with the unit tests.
+    :return: The test game state.
+    """
+    state = GameState.getBasicState()
+
+    # Set the food counts
+    state.inventories[0].foodCount = 3
+    state.inventories[1].foodCount = 0
+
+    # Set my grass in a row on top
+    my_grass_list = [Construction((x, 0), GRASS) for x in range(0, 9)]
+    state.inventories[0].constrs.extend(my_grass_list)
+    state.inventories[1].constrs.extend(my_grass_list)
+    for grass in my_grass_list:
+        state.board[grass.coords[0]][grass.coords[1]].constr = grass
+
+    # Set the enemy grass in a row on the bottom.
+    enemy_grass_list = [Construction((x, 9), GRASS) for x in range(0, 9)]
+    state.inventories[1].constrs.extend(enemy_grass_list)
+    state.inventories[1].constrs.extend(enemy_grass_list)
+    for grass in enemy_grass_list:
+        state.board[grass.coords[0]][grass.coords[1]].constr = enemy_grass_list
+
+    # Create one food for me
+    my_food = Construction((9, 1), FOOD)
+    state.board[my_food.coords[0]][my_food.coords[1]].constr = my_food
+    state.inventories[0].constrs.append(my_food)
+
+    # Create a worker for me that is carrying
+    my_worker = Ant((8, 0), WORKER, 0)
+    my_worker.carrying = True
+    state.board[my_worker.coords[0]][my_worker.coords[1]].ant = my_worker
+    state.inventories[0].ants.append(my_worker)
+
+    # Create a drone for me
+    my_drone = Ant((2, 8), DRONE, 0)
+    state.board[my_drone.coords[0]][my_drone.coords[1]].ant = my_drone
+    state.inventories[0].ants.append(my_drone)
+
+    return state
+
+
+def run_unit_tests() -> None:
+    """
+    run_unit_tests
+
+    Runs the unit tests for the agent.
+    """
+    test_game_state = create_test_game_state()
+    my_player = AIPlayer(0)
+
+    # Test the evaluate_game_state function. It should evaluate to 1.0
+    evaluation_score = my_player.evaluate_game_state(test_game_state)
+    if evaluation_score != 1.0:
+        print("Test for evaluate_game_state failed!")
+
+    # Test the find_best_move method.
+    # It should want to move the queen off the anthill.
+    actual_best_move = my_player.find_best_move(test_game_state, 0)
+    expected_best_move = Move(MOVE_ANT, [(0, 0), (1, 0)])
+    if actual_best_move.moveType != expected_best_move.moveType or\
+            actual_best_move.coordList != expected_best_move.coordList:
+        print("Test for find_best_move failed!")
+
+    # Test the average_evaluation_score method.
+    # It should average to 0.0 with the given nodes.
+    node_list = [Node(Move(None), test_game_state, 1.0), Node(Move(None), test_game_state, -1.0)]
+    average_eval_score = my_player.average_evaluation_score(node_list)
+    if average_eval_score != 0.0:
+        print("Test for average_evaluation_score failed!")
+
+
+# Run the unit tests
+run_unit_tests()
