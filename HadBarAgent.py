@@ -104,12 +104,19 @@ class AIPlayer(Player):
         """
         pass
 
-    def evaluate_game_state(self, current_state):
+    def evaluate_game_state(self, current_state) -> float:
+        """
+        evaluate_game_state
+
+        Given a game state, calculates an evaluation score between -1.0 and 1.0.
+
+        :param current_state: The current game state.
+        :return: The evaluation score (float)
+        """
         game_state_score = 0.0
 
-        # Number of worker ants
+        # Get all the relevant items I need.
         items = Items(current_state)
-
         my_soldiers = items.my_soldiers
         my_r_soldiers = items.my_r_soldiers
         my_drones = items.my_drones
@@ -118,26 +125,87 @@ class AIPlayer(Player):
         my_anthill = items.my_anthill
         my_tunnel = items.my_tunnel
 
-        '''
         ant_at_anthill = getAntAt(current_state, my_anthill.coords)
         if ant_at_anthill and ant_at_anthill.type != WORKER:
-            return -0.99'''
-
-        ant_at_tunnel = getAntAt(current_state, my_tunnel.coords)
-        if ant_at_tunnel and ant_at_tunnel.type != WORKER:
-            return -0.99
-
-        if my_r_soldiers or my_drones:
-            return -0.99
-
-        my_food_count = items.my_food_count
-        if len(my_soldiers) > 1:
             return -0.99
 
         if len(my_workers) != 1:
             return -0.99
 
-        approx_dist_worker = {
+        if my_r_soldiers or my_drones or my_soldiers:
+            return -0.99
+
+        my_food_count = items.my_food_count
+        game_state_score += (my_food_count / 11)
+
+        enemy_food_count = items.enemy_food_count
+        game_state_score -= (enemy_food_count / 11)
+
+        '''
+        my_soldiers = items.my_soldiers
+        if len(my_soldiers) != 1:
+            return -0.99'''
+
+        enemy_workers = items.enemy_workers
+        if enemy_workers:
+            game_state_score -= 0.75
+
+        DEFAULT_REWARD = 0.00
+        dist_rewards: Dict[int, float] = {
+            0: 0.80,
+            1: 0.65,
+            2: 0.50,
+            3: 0.35,
+            4: 0.20,
+            5: 0.00,
+            6: -0.10,
+            7: -0.20,
+            8: -0.35,
+            9: -0.50,
+            10: -0.60,
+            11: -0.70,
+            12: -0.80
+        }
+
+        my_closest_food = items.my_closest_food
+        if my_workers:
+            for worker in my_workers:
+                if worker.carrying:
+                    dist_to_anthill = approxDist(worker.coords, my_anthill.coords)
+                    dist_to_tunnel = approxDist(worker.coords, my_tunnel.coords)
+                    min_construction_dist = min(dist_to_anthill, dist_to_tunnel)
+                    game_state_score += dist_rewards.get(min_construction_dist, DEFAULT_REWARD)
+                else:
+                    dist_to_closest_food = approxDist(worker.coords, my_closest_food.coords)
+                    game_state_score += dist_rewards.get(dist_to_closest_food, DEFAULT_REWARD)
+
+
+        '''
+        soldier_dist_rewards: Dict[int, float] = {
+            0: 0.80,
+            1: 0.65,
+            2: 0.50,
+            3: 0.35,
+            4: 0.20,
+            5: 0.00,
+            6: -0.10,
+            7: -0.20,
+            8: -0.35,
+            9: -0.50,
+            10: -0.60,
+            11: -0.70,
+            12: -0.80
+        }
+
+        DEFAULT_REWARD = 0.00
+        # Get distance between attacking ants and enemy worker to attack the enemy workers
+        if enemy_workers:
+            for soldier in my_soldiers:
+                dist_to_enemy_worker = approxDist(soldier.coords, enemy_workers[0].coords)
+                game_state_score += soldier_dist_rewards.get(dist_to_enemy_worker, DEFAULT_REWARD)'''
+
+        '''
+        worker_dist_rewards: Dict[int, float] = {
             0: 0.80,
             1: 0.60,
             2: 0.40,
@@ -153,7 +221,7 @@ class AIPlayer(Player):
             12: -0.80
         }
 
-        approx_dist_soldier = {
+        soldier_dist_rewards: Dict[int, float] = {
             0: 0.00,
             1: 0.56,
             2: 0.47,
@@ -168,9 +236,24 @@ class AIPlayer(Player):
             11: -0.45,
             12: -0.50
         }
+        
 
-        # get distance between attakcing ants and enemy worker
-        # attack the enemy workers
+        food_count_rewards: Dict[int, float] = {
+            0: 0.00,
+            1: 0.10,
+            2: 0.20,
+            3: 0.30,
+            4: 0.40,
+            5: 0.50,
+            6: 0.60,
+            7: 0.70,
+            8: 0.80,
+            9: 0.90,
+            10: 1.00
+        }'''
+
+        '''
+        # Get distance between attacking ants and enemy worker to attack the enemy workers
         enemy_workers = items.enemy_workers
         if enemy_workers:
             for soldier in my_soldiers:
@@ -180,30 +263,20 @@ class AIPlayer(Player):
                     if enemy_workers[0].coords in listAdjacent(soldier.coords):
                         game_state_score += 0.5
                 else:
-                    game_state_score += approx_dist_soldier.get(dist_to_enemy_worker, -0.60)
+                    game_state_score += soldier_dist_rewards.get(dist_to_enemy_worker, -0.60)
 
-        # stop queen from sitting on anthill
+        # Stop queen from sitting on anthill
         if approxDist(my_anthill.coords, my_queen.coords) == 0:
-            game_state_score -= .99
-        # have workers get food
-        for worker in my_workers:
-            if worker.carrying:
-                dist_to_tunnel = approxDist(worker.coords, my_tunnel.coords)
-                dist_to_anthill = approxDist(worker.coords, my_anthill.coords)
-                game_state_score += approx_dist_worker.get(min(dist_to_anthill, dist_to_tunnel), -0.80)
-            else:
-                my_closest_food = items.my_closest_food
-                dist_to_closest_food = approxDist(worker.coords, my_closest_food.coords)
-                game_state_score += approx_dist_worker.get(dist_to_closest_food, -0.80)
+            game_state_score -= .99'''
 
-        # check if there is a winner
+        # Check if there is a winner
         winner = getWinner(current_state)
         if winner == 1:
             return 1.0
         elif winner == 0:
             return -1.0
 
-        # make sure returning valid number
+        # Make sure to return valid number
         if game_state_score >= 1.0:
             return 0.99
         elif game_state_score <= -1.0:
@@ -221,6 +294,7 @@ class AIPlayer(Player):
         :param current_depth: The current depth level in the tree.
         :return: The Move that the agent wishes to perform.
         """
+
         # The children nodes are checked, so it goes to a depth limit of 2.
         DEPTH_LIMIT = 1
         all_legal_moves = listAllLegalMoves(current_state)
@@ -254,10 +328,7 @@ class AIPlayer(Player):
         :param nodes: The list of nodes to check.
         :return: The average evaluation score of all the checked nodes.
         """
-        summation = 0
-        for node in nodes:
-            summation += node.state_evaluation
-        return summation / len(nodes)
+        return sum(node.state_evaluation for node in nodes) / len(nodes)
 
     def getNextState(self, currentState, move):
         """
@@ -545,3 +616,9 @@ class Items:
         :return: The enemy's tunnel.
         """
         return getConstrList(self._current_state, self._enemy, (TUNNEL,))[0]
+
+
+def test_game_state():
+    initial_state = GameState.getBasicState()
+    initial_state.board = []
+    my_ants = [Ant([], )]
