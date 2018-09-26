@@ -557,7 +557,7 @@ def create_test_game_state() -> GameState:
 
     # Set the food counts
     state.inventories[0].foodCount = 3
-    state.inventories[1].foodCount = 0
+    state.inventories[1].foodCount = 2
 
     # Set my grass in a row on top
     my_grass_list = [Construction((x, 0), GRASS) for x in range(0, 9)]
@@ -601,9 +601,9 @@ def run_unit_tests() -> None:
     test_game_state = create_test_game_state()
     my_player = AIPlayer(0)
 
-    # Test the evaluate_game_state function. It should evaluate to 1.0
+    # Test the evaluate_game_state function. It should evaluate to about -0.45
     evaluation_score = my_player.evaluate_game_state(test_game_state)
-    if evaluation_score != 1.0:
+    if round(evaluation_score, 2) != -0.45:
         print("Test for evaluate_game_state failed!")
 
     # Test the find_best_move method.
