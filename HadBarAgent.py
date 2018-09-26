@@ -104,6 +104,102 @@ class AIPlayer(Player):
         """
         pass
 
+    def _has_unwanted_conditions(self, current_state: GameState, my_anthill: Construction,
+                                 my_workers: List[Ant], my_drones: List[Ant],
+                                 my_soldiers: List[Ant], my_r_soldiers: List[Ant]) -> bool:
+        """
+        Helper function that checks for unwanted conditions in the GameState.
+        If these exist, my agent will evaluate the game state at -0.99.
+
+        :param current_state: The current GameState.
+        :param my_anthill: My anthill.
+        :param my_workers: My tunnel.
+        :param my_drones: The list of my drones.
+        :param my_soldiers: The list of my soldiers.
+        :param my_r_soldiers: The list of my ranged soldiers.
+        :return: True (unwanted condition exist), otherwise False.
+        """
+
+        # To get the queen (and anything else besides the worker) off my anthill.
+        ant_at_anthill = getAntAt(current_state, my_anthill.coords)
+        if ant_at_anthill and ant_at_anthill.type != WORKER:
+            return True
+
+        # Want one worker no matter what.
+        if len(my_workers) != 1:
+            return True
+
+        # Want no ranged soldiers or soldiers.
+        # Also want only 1 drone (although 0 initially is okay).
+        if my_r_soldiers or my_soldiers or len(my_drones) not in [0, 1]:
+            return True
+        return False
+
+    def _gather_food(self, dist_rewards: Dict[int, float],
+                     my_closest_food: Construction, my_workers: List[Ant],
+                     my_anthill: Construction, my_tunnel: Construction) -> float:
+        """
+        _gather_food
+
+        Helper function that rewards (or punishes) the agent if my workers get (or don't get) food.
+
+        :param dist_rewards: The dictionary of rewards and punishments for given distances.
+        :param my_closest_food: The closest food to my anthill or tunnel.
+        :param my_workers: The list of my workers.
+        :param my_anthill: My anthill.
+        :param my_tunnel: My tunnel.
+        :return: The delta value for the evaluation score.
+        """
+
+        evaluation_score_delta = 0.0
+
+        # The worker doesn't get rewarded or punished by default.
+        DEFAULT_WORKER_REWARD = 0.00
+        if my_workers:
+            for worker in my_workers:
+                # If the worker is carrying food, need to get to my anthill or tunnel.
+                if worker.carrying:
+                    dist_to_anthill = approxDist(worker.coords, my_anthill.coords)
+                    dist_to_tunnel = approxDist(worker.coords, my_tunnel.coords)
+                    min_construction_dist = min(dist_to_anthill, dist_to_tunnel)
+                    evaluation_score_delta += dist_rewards.get(min_construction_dist,
+                                                               DEFAULT_WORKER_REWARD)
+                # If the worker is not carrying food, need to get to the food source.
+                else:
+                    dist_to_closest_food = approxDist(worker.coords, my_closest_food.coords)
+                    evaluation_score_delta += dist_rewards.get(dist_to_closest_food,
+                                                               DEFAULT_WORKER_REWARD)
+        return evaluation_score_delta
+
+    def _kill_enemy_workers(self, dist_rewards: Dict[int, float], my_drones: List[Ant],
+                            enemy_workers: List[Ant]) -> float:
+        """
+        _kill_enemy_workers
+
+        Helper function that rewards (or punishes) my agent for killing the enemy workers.
+
+        :param dist_rewards: The dictionary of rewards and punishments for given distances.
+        :param my_drones: The list of my drones.
+        :param enemy_workers: The list of the enemy workers.
+        :return: The delta value for the evaluation score.
+        """
+
+        evaluation_score_delta = 0.0
+
+        # Punish the drone by default (otherwise use dist_rewards dictionary).
+        DEFAULT_DRONE_REWARD = -0.60
+
+        # Punish the agent if the enemy has any workers.
+        if enemy_workers:
+            evaluation_score_delta -= 1.00
+
+        # Rewards (or punishes) the agent for getting my drone close to the enemy worker.
+        if enemy_workers:
+            for drone in my_drones:
+                dist_to_worker = approxDist(drone.coords, enemy_workers[0].coords)
+                evaluation_score_delta += dist_rewards.get(dist_to_worker, DEFAULT_DRONE_REWARD)
+        return evaluation_score_delta
+
     def evaluate_game_state(self, current_state) -> float:
         """
         evaluate_game_state
@@ -113,44 +209,21 @@ class AIPlayer(Player):
         :param current_state: The current game state.
         :return: The evaluation score (float)
         """
-        game_state_score = 0.0
+
+        evaluation_score = 0.0
 
         # Get all the relevant items I need.
         items = Items(current_state)
-        my_soldiers = items.my_soldiers
-        my_r_soldiers = items.my_r_soldiers
-        my_drones = items.my_drones
-        my_workers = items.my_workers
-        my_queen = items.my_queen
+        my_closest_food = items.my_closest_food
         my_anthill = items.my_anthill
         my_tunnel = items.my_tunnel
-
-        ant_at_anthill = getAntAt(current_state, my_anthill.coords)
-        if ant_at_anthill and ant_at_anthill.type != WORKER:
-            return -0.99
-
-        if len(my_workers) != 1:
-            return -0.99
-
-        if my_r_soldiers or my_drones or my_soldiers:
-            return -0.99
-
-        my_food_count = items.my_food_count
-        game_state_score += (my_food_count / 11)
-
-        enemy_food_count = items.enemy_food_count
-        game_state_score -= (enemy_food_count / 11)
-
-        '''
+        my_workers = items.my_workers
+        my_drones = items.my_drones
         my_soldiers = items.my_soldiers
-        if len(my_soldiers) != 1:
-            return -0.99'''
-
+        my_r_soldiers = items.my_r_soldiers
         enemy_workers = items.enemy_workers
-        if enemy_workers:
-            game_state_score -= 0.75
 
-        DEFAULT_REWARD = 0.00
+        # All the distance costs for the drone and worker.
         dist_rewards: Dict[int, float] = {
             0: 0.80,
             1: 0.65,
@@ -158,116 +231,21 @@ class AIPlayer(Player):
             3: 0.35,
             4: 0.20,
             5: 0.00,
-            6: -0.10,
-            7: -0.20,
-            8: -0.35,
-            9: -0.50,
-            10: -0.60,
-            11: -0.70,
-            12: -0.80
+            6: -0.15,
+            7: -0.30,
+            8: -0.40,
+            9: -0.45
         }
 
-        my_closest_food = items.my_closest_food
-        if my_workers:
-            for worker in my_workers:
-                if worker.carrying:
-                    dist_to_anthill = approxDist(worker.coords, my_anthill.coords)
-                    dist_to_tunnel = approxDist(worker.coords, my_tunnel.coords)
-                    min_construction_dist = min(dist_to_anthill, dist_to_tunnel)
-                    game_state_score += dist_rewards.get(min_construction_dist, DEFAULT_REWARD)
-                else:
-                    dist_to_closest_food = approxDist(worker.coords, my_closest_food.coords)
-                    game_state_score += dist_rewards.get(dist_to_closest_food, DEFAULT_REWARD)
+        # Just return -0.99 if an unwanted condition exists in the GameState.
+        if self._has_unwanted_conditions(current_state, my_anthill, my_workers, my_drones,
+                                         my_soldiers, my_r_soldiers):
+            return -0.99
 
-
-        '''
-        soldier_dist_rewards: Dict[int, float] = {
-            0: 0.80,
-            1: 0.65,
-            2: 0.50,
-            3: 0.35,
-            4: 0.20,
-            5: 0.00,
-            6: -0.10,
-            7: -0.20,
-            8: -0.35,
-            9: -0.50,
-            10: -0.60,
-            11: -0.70,
-            12: -0.80
-        }
-
-        DEFAULT_REWARD = 0.00
-        # Get distance between attacking ants and enemy worker to attack the enemy workers
-        if enemy_workers:
-            for soldier in my_soldiers:
-                dist_to_enemy_worker = approxDist(soldier.coords, enemy_workers[0].coords)
-                game_state_score += soldier_dist_rewards.get(dist_to_enemy_worker, DEFAULT_REWARD)'''
-
-        '''
-        worker_dist_rewards: Dict[int, float] = {
-            0: 0.80,
-            1: 0.60,
-            2: 0.40,
-            3: 0.30,
-            4: 0.20,
-            5: 0.10,
-            6: 0.00,
-            7: -0.10,
-            8: -0.20,
-            9: -0.30,
-            10: -0.40,
-            11: -0.60,
-            12: -0.80
-        }
-
-        soldier_dist_rewards: Dict[int, float] = {
-            0: 0.00,
-            1: 0.56,
-            2: 0.47,
-            3: 0.35,
-            4: 0.21,
-            5: 0.15,
-            6: -0.10,
-            7: -0.25,
-            8: -0.30,
-            9: -0.35,
-            10: -0.40,
-            11: -0.45,
-            12: -0.50
-        }
-        
-
-        food_count_rewards: Dict[int, float] = {
-            0: 0.00,
-            1: 0.10,
-            2: 0.20,
-            3: 0.30,
-            4: 0.40,
-            5: 0.50,
-            6: 0.60,
-            7: 0.70,
-            8: 0.80,
-            9: 0.90,
-            10: 1.00
-        }'''
-
-        '''
-        # Get distance between attacking ants and enemy worker to attack the enemy workers
-        enemy_workers = items.enemy_workers
-        if enemy_workers:
-            for soldier in my_soldiers:
-                dist_to_enemy_worker = approxDist(soldier.coords, enemy_workers[0].coords)
-                if dist_to_enemy_worker <= 1:
-                    game_state_score += 0.25
-                    if enemy_workers[0].coords in listAdjacent(soldier.coords):
-                        game_state_score += 0.5
-                else:
-                    game_state_score += soldier_dist_rewards.get(dist_to_enemy_worker, -0.60)
-
-        # Stop queen from sitting on anthill
-        if approxDist(my_anthill.coords, my_queen.coords) == 0:
-            game_state_score -= .99'''
+        # Agent is rewarded for gathering food and killing the enemy workers.
+        evaluation_score += self._gather_food(dist_rewards, my_closest_food, my_workers,
+                                              my_anthill, my_tunnel)
+        evaluation_score += self._kill_enemy_workers(dist_rewards, my_drones, enemy_workers)
 
         # Check if there is a winner
         winner = getWinner(current_state)
@@ -277,11 +255,11 @@ class AIPlayer(Player):
             return -1.0
 
         # Make sure to return valid number
-        if game_state_score >= 1.0:
+        if evaluation_score >= 1.0:
             return 0.99
-        elif game_state_score <= -1.0:
+        elif evaluation_score <= -1.0:
             return -0.99
-        return game_state_score
+        return evaluation_score
 
     def find_best_move(self, current_state, current_depth):
         """
@@ -295,8 +273,7 @@ class AIPlayer(Player):
         :return: The Move that the agent wishes to perform.
         """
 
-        # The children nodes are checked, so it goes to a depth limit of 2.
-        DEPTH_LIMIT = 1
+        DEPTH_LIMIT = 2
         all_legal_moves = listAllLegalMoves(current_state)
         all_nodes = []
 
@@ -307,18 +284,32 @@ class AIPlayer(Player):
 
             next_state_reached = self.getNextState(current_state, move)
             node = Node(move, next_state_reached, self.evaluate_game_state(next_state_reached))
-
-            # Recursively goes through the search tree.
-            if current_depth < DEPTH_LIMIT:
-                node.state_evaluation = self.find_best_move(next_state_reached, current_depth + 1)
             all_nodes.append(node)
 
+        best_nodes = self.get_best_nodes(all_nodes)
+        if current_depth < DEPTH_LIMIT:
+            for i, node in enumerate(best_nodes):
+                best_nodes[i].state_evaluation = self.find_best_move(node.state, current_depth + 1)
+
         if current_depth > 0:
-            return self.average_evaluation_score(all_nodes)
+            return self.average_evaluation_score(best_nodes)
         else:
             # Citation: https://stackoverflow.com/questions/13067615/
             # python-getting-the-max-value-of-y-from-a-list-of-objects
-            return max(all_nodes, key=lambda x: x.state_evaluation).move
+            return max(best_nodes, key=lambda x: x.state_evaluation).move
+
+    def get_best_nodes(self, nodes: list) -> list:
+        """
+        get_best_nodes
+
+        Used for finding the best nodes to prune the tree properly.
+
+        :param nodes: The list of nodes to check.
+        :return: The best nodes (number determined by NUM_BEST_NODES constant).
+        """
+        NUM_BEST_NODES = 5
+        sorted_nodes = sorted(nodes, key=lambda node: node.state_evaluation, reverse=True)
+        return sorted_nodes[:NUM_BEST_NODES]
 
     def average_evaluation_score(self, nodes: list) -> float:
         """
@@ -492,15 +483,6 @@ class Items:
         return getAntList(self._current_state, self._me)
 
     @property
-    def my_queen(self) -> Ant:
-        """
-        my_queen
-
-        :return: My queen from my inventory.
-        """
-        return getAntList(self._current_state, self._me, (QUEEN,))[0]
-
-    @property
     def my_workers(self) -> List[Ant]:
         """
         my_workers
@@ -555,42 +537,6 @@ class Items:
         return getConstrList(self._current_state, self._me, (TUNNEL,))[0]
 
     @property
-    def enemy_drones(self) -> List[Ant]:
-        """
-        enemy_drones
-
-        :return: A list of enemy drones.
-        """
-        return getAntList(self._current_state, self._enemy, (DRONE,))
-
-    @property
-    def enemy_soldiers(self) -> List[Ant]:
-        """
-        my_soldiers
-
-        :return: A list of my soldiers.
-        """
-        return getAntList(self._current_state, self._enemy, (SOLDIER,))
-
-    @property
-    def enemy_r_soldiers(self) -> List[Ant]:
-        """
-        enemy_r_soldiers
-
-        :return: A list of enemy ranged soldiers.
-        """
-        return getAntList(self._current_state, self._enemy, (R_SOLDIER,))
-
-    @property
-    def enemy_queen(self) -> Ant:
-        """
-        enemy_queen
-
-        :return: Enemy queen from my inventory.
-        """
-        return getAntList(self._current_state, self._enemy, (QUEEN,))
-
-    @property
     def enemy_workers(self) -> List[Ant]:
         """
         enemy_workers
@@ -598,27 +544,3 @@ class Items:
         :return: A list of the enemy's workers.
         """
         return getAntList(self._current_state, self._enemy, (WORKER,))
-
-    @property
-    def enemy_anthill(self) -> Construction:
-        """
-        enemy_anthill
-
-        :return: The enemy's anthill.
-        """
-        return getConstrList(self._current_state, self._enemy, (ANTHILL,))[0]
-
-    @property
-    def enemy_tunnel(self) -> Construction:
-        """
-        enemy_tunnel
-
-        :return: The enemy's tunnel.
-        """
-        return getConstrList(self._current_state, self._enemy, (TUNNEL,))[0]
-
-
-def test_game_state():
-    initial_state = GameState.getBasicState()
-    initial_state.board = []
-    my_ants = [Ant([], )]
